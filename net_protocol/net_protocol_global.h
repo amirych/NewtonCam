@@ -1,0 +1,12 @@
+#ifndef NET_PROTOCOL_GLOBAL_H
+#define NET_PROTOCOL_GLOBAL_H
+
+#include <QtCore/qglobal.h>
+
+#if defined(NET_PROTOCOL_LIBRARY)
+#  define NET_PROTOCOLSHARED_EXPORT Q_DECL_EXPORT
+#else
+#  define NET_PROTOCOLSHARED_EXPORT Q_DECL_IMPORT
+#endif
+
+#endif // NET_PROTOCOL_GLOBAL_H
