@@ -12,14 +12,14 @@
 
                 /*  Constructors  */
 
-NetPacket::NetPacket(const unsigned int id, const QString &content):
+NetPacket::NetPacket(const netpacket_id_t id, const QString &content):
     ID(id), Content(content)
 {
     MakePacket();
 }
 
 
-NetPacket::NetPacket(const unsigned int id, const char* content):
+NetPacket::NetPacket(const netpacket_id_t id, const char* content):
     ID(id), Content(content)
 {
     MakePacket();
@@ -32,7 +32,7 @@ NetPacket::NetPacket(): NetPacket(NETPROTOCOL_PACKET_ID_INFO,"")
 }
 
 
-NetPacket::NetPacket(const unsigned int id): NetPacket(id,"")
+NetPacket::NetPacket(const netpacket_id_t id): NetPacket(id,"")
 {
 
 }
@@ -70,7 +70,7 @@ QByteArray NetPacket::GetByteView() const
 }
 
 
-unsigned int NetPacket::GetPacketID() const
+netpacket_id_t NetPacket::GetPacketID() const
 {
     return ID;
 }
@@ -88,7 +88,7 @@ bool NetPacket::isPacketValid() const
 }
 
 
-void NetPacket::SetContent(const unsigned int id, const char *content)
+void NetPacket::SetContent(const netpacket_id_t id, const char *content)
 {
     ID = id;
     Content = content;
@@ -96,7 +96,7 @@ void NetPacket::SetContent(const unsigned int id, const char *content)
 }
 
 
-void NetPacket::SetContent(const unsigned int id, const QString &content)
+void NetPacket::SetContent(const netpacket_id_t id, const QString &content)
 {
     ID = id;
     Content = content;
@@ -220,6 +220,8 @@ void CmdNetPacket::Init()
     CmdName = CmdName.simplified(); // remove whitespaces from start and end, and replace multiple whitespace by single one
 //    CmdName.replace(' ', "_");
     CmdName.replace(NETPROTOCOL_CONTENT_DELIMETER , "_");
+
+    CmdName = CmdName.toUpper();
 
     SetContent(NETPROTOCOL_PACKET_ID_CMD,CmdName + NETPROTOCOL_CONTENT_DELIMETER + Args);
 }
@@ -361,4 +363,77 @@ bool CmdNetPacket::GetCmdArgs(QVector<double> *args)
     }
 
     return true;
+}
+
+
+
+                /******************************************
+                *                                         *
+                *   StatusNetPacket class implementation  *
+                *                                         *
+                ******************************************/
+
+
+StatusNetPacket::StatusNetPacket(const status_t err_no, const QString &err_str):
+    NetPacket(NETPROTOCOL_PACKET_ID_STATUS), Err_Code(err_no), Err_string(err_str)
+{
+    Init();
+}
+
+
+StatusNetPacket::StatusNetPacket(const status_t err_no, const char* err_str):
+    NetPacket(NETPROTOCOL_PACKET_ID_STATUS), Err_Code(err_no), Err_string(err_str)
+{
+    Init();
+}
+
+
+StatusNetPacket::StatusNetPacket(const status_t err_no):
+    StatusNetPacket(err_no,"")
+{
+
+}
+
+
+StatusNetPacket::StatusNetPacket():
+    StatusNetPacket(NETPROTOCOL_ERROR_UNKNOWN,"")
+{
+
+}
+
+
+void StatusNetPacket::Init()
+{
+    QString str;
+
+    QTextStream content(&str);
+
+    content << Err_Code << NETPROTOCOL_CONTENT_DELIMETER << Err_string;
+
+    SetContent(NETPROTOCOL_PACKET_ID_STATUS,str);
+}
+
+
+void StatusNetPacket::SetStatus(const status_t err_no, const QString &err_str)
+{
+    Err_Code = err_no;
+    Err_string = err_str;
+
+    Init();
+}
+
+
+void StatusNetPacket::SetStatus(const status_t err_no, const char *err_str)
+{
+    Err_Code = err_no;
+    Err_string = err_str;
+
+    Init();
+}
+
+
+status_t StatusNetPacket::GetStatus(QString *err_str) const
+{
+    *err_str = Err_string;
+    return Err_Code;
 }

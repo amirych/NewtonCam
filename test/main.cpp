@@ -43,9 +43,13 @@ int main(int argc, char *argv[])
     aa.push_back(110);
     aa.push_back(210);
 
-    pk.SetCommand("   ROI   ",aa);
+    pk.SetCommand("   roi   ",aa);
 
     cout << "PACKET: " << pk.GetByteView().data() << endl;
+
+
+    StatusNetPacket stpk(-10,"Server time-out!");
+    cout << "PACKET: " << stpk.GetByteView().data() << endl;
 
     return a.exec();
 }
