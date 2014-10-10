@@ -217,7 +217,7 @@ CmdNetPacket::CmdNetPacket(): CmdNetPacket("","")
 
 void CmdNetPacket::Init()
 {
-    CmdName.simplified(); // remove whitespaces from start and end, and replace multiple whitespace by single one
+    CmdName = CmdName.simplified(); // remove whitespaces from start and end, and replace multiple whitespace by single one
 //    CmdName.replace(' ', "_");
     CmdName.replace(NETPROTOCOL_CONTENT_DELIMETER , "_");
 
@@ -356,7 +356,7 @@ bool CmdNetPacket::GetCmdArgs(QVector<double> *args)
 {
     *args = ArgsVec;
 
-    if ( Args.isEmpty() ) {
+    if ( ArgsVec.isEmpty() ) {
         return false;
     }
 

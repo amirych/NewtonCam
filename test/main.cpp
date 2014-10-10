@@ -26,5 +26,26 @@ int main(int argc, char *argv[])
 
     cout << "PACKET: " << pk.GetByteView().data() << endl;
 
+    pk.SetCommand("COM","skj  s-kjl s");
+
+    QString ss;
+
+    pk.GetCmdArgs(&ss);
+
+    cout << "NAME: " << pk.GetCmdName().toStdString().c_str() <<
+            "; ARGS: " << ss.toStdString().c_str() << endl;
+
+    ok = pk.GetCmdArgs(&aa);
+    cout << "IS NUM? " << ok << endl;
+
+    aa.push_back(10);
+    aa.push_back(10);
+    aa.push_back(110);
+    aa.push_back(210);
+
+    pk.SetCommand("   ROI   ",aa);
+
+    cout << "PACKET: " << pk.GetByteView().data() << endl;
+
     return a.exec();
 }
