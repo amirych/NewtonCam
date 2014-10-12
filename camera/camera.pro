@@ -1,23 +1,22 @@
 #-------------------------------------------------
 #
-# Project created by QtCreator 2014-10-07T16:35:20
+# Project created by QtCreator 2014-10-11T19:28:12
 #
 #-------------------------------------------------
 
 QT       -= gui
 
-TARGET = net_protocol
+TARGET = camera
 TEMPLATE = lib
 
 QMAKE_CXXFLAGS += -std=c++11
 
-DEFINES += NET_PROTOCOL_LIBRARY
+DEFINES += CAMERA_LIBRARY
 
-SOURCES += netpacket.cpp
+SOURCES += camera.cpp
 
-HEADERS += netpacket.h\
-        net_protocol_global.h \
-    proto_defs.h
+HEADERS += camera.h\
+        camera_global.h
 
 unix:!symbian {
     maemo5 {
@@ -27,3 +26,8 @@ unix:!symbian {
     }
     INSTALLS += target
 }
+
+unix:!macx|win32: LIBS += -L$$PWD/../AndorSDK/ -landor
+
+INCLUDEPATH += $$PWD/../AndorSDK
+DEPENDPATH += $$PWD/../AndorSDK

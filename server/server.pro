@@ -1,23 +1,20 @@
 #-------------------------------------------------
 #
-# Project created by QtCreator 2014-10-07T16:35:20
+# Project created by QtCreator 2014-10-11T10:11:18
 #
 #-------------------------------------------------
 
 QT       -= gui
 
-TARGET = net_protocol
+TARGET = server
 TEMPLATE = lib
 
-QMAKE_CXXFLAGS += -std=c++11
+DEFINES += SERVER_LIBRARY
 
-DEFINES += NET_PROTOCOL_LIBRARY
+SOURCES += server.cpp
 
-SOURCES += netpacket.cpp
-
-HEADERS += netpacket.h\
-        net_protocol_global.h \
-    proto_defs.h
+HEADERS += server.h\
+        server_global.h
 
 unix:!symbian {
     maemo5 {

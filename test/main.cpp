@@ -1,16 +1,18 @@
-#include <QCoreApplication>
+//#include <QCoreApplication>
 
 
 #include "netpacket.h"
+#include "camera.h"
 
 #include<iostream>
+#include<fstream>
 #include<QDebug>
 
 using namespace std;
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication a(argc, argv);
+//    QCoreApplication a(argc, argv);
 
 
     CmdNetPacket pk("EXP TIME",10.00009);
@@ -51,5 +53,12 @@ int main(int argc, char *argv[])
     StatusNetPacket stpk(-10,"Server time-out!");
     cout << "PACKET: " << stpk.GetByteView().data() << endl;
 
-    return a.exec();
+    ofstream ff("ss");
+    Camera cc(ff);
+    ff.close();
+
+    cout << "Camera last error: " << cc.GetLastError() << endl;
+
+//    return a.exec();
+    return 0;
 }
