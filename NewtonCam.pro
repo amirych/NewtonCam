@@ -4,4 +4,5 @@ SUBDIRS += \
     net_protocol \
     camera \
     server \
-    test
+    test \
+    cam_caps

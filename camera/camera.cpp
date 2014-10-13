@@ -2,20 +2,24 @@
 
 #include "atmcdLXd.h"
 
+
             /* Andor API wrapper macro definition */
 
 #define ANDOR_API_CALL(API_FUNC, ...) { \
     lastError = API_FUNC(__VA_ARGS__); \
     emit CameraError(lastError); \
+    time_point = std::time(nullptr); \
+    *LogFile << std::asctime(std::localtime(&time_point)); \
+    *LogFile << "   [Andor API] " << #API_FUNC << "(" << #__VA_ARGS__ << "): "; \
     if ( lastError == DRV_SUCCESS ) { \
-        *LogFile << "Andor API: [" << #API_FUNC << "]: OK " << " (in " << __FILE__ \
-                 << " at line " << __LINE__ << ")"; \
+        *LogFile << "OK "; \
     } else { \
-        *LogFile << "Andor API: [" << #API_FUNC << "]: error = " << lastError \
-                 << " (in " << __FILE__ << " at line " << __LINE__ << ")"; \
+        *LogFile << "error = " << lastError; \
     } \
-    *LogFile << std::endl << std::flush; \
+    *LogFile << " (in " << __FILE__ << " at line " << __LINE__ << ")" << std::endl << std::flush; \
 }
+
+
 
             /********************************
             *                               *

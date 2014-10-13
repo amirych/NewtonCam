@@ -5,6 +5,7 @@
 
 #include<iostream>
 #include<QObject>
+#include<ctime>
 
 
             /******************************************
@@ -37,6 +38,9 @@ private:
     std::ostream *LogFile;
 
     unsigned int lastError;
+
+
+    time_t time_point;
 
     inline void Call_Andor_API(unsigned int err_code, const char *file, int line);
     inline void Call_Andor_API(unsigned int err_code, const char *api_func,
