@@ -1,6 +1,10 @@
 #include "camera.h"
 
-#include "atmcdLXd.h"
+#ifdef _WIN32 || _WIN64
+    #include "atmcd32d.h"
+#else
+    #include "atmcdLXd.h"
+#endif
 
 
             /* Andor API wrapper macro definition */

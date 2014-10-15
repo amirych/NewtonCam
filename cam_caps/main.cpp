@@ -2,7 +2,11 @@
 #include<thread>
 #include<chrono>
 
-#include "atmcdLXd.h"
+#ifdef _WIN32 || _WIN64
+    #include "atmcd32d.h"
+#else
+    #include "atmcdLXd.h"
+#endif
 
 using namespace std;
 

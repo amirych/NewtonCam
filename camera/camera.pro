@@ -27,7 +27,10 @@ unix:!symbian {
     INSTALLS += target
 }
 
-unix:!macx|win32: LIBS += -L$$PWD/../AndorSDK/ -landor
+#unix:!macx|win32: LIBS += -L$$PWD/../AndorSDK/ -landor
+
+win32: LIBS += -L$$PWD/../AndorSDK -latmcd64m
+unix:!macx: LIBS += -L$$PWD/../AndorSDK/ -landor
 
 INCLUDEPATH += $$PWD/../AndorSDK
 DEPENDPATH += $$PWD/../AndorSDK
