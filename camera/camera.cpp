@@ -38,7 +38,7 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
 {
     LogFile = &log_file;
 
-    int no_cameras;
+    at_32 no_cameras;
 
     ANDOR_API_CALL(GetAvailableCameras,&no_cameras);
     ANDOR_API_CALL(Initialize,"");
@@ -58,7 +58,7 @@ Camera::Camera(long camera_index, QObject *parent): Camera(std::cerr, camera_ind
 
 Camera::~Camera()
 {
-    ANDOR_API_CALL(ShutDown);
+    ANDOR_API_CALL(ShutDown,);
 }
 
             /*  public methods  */
