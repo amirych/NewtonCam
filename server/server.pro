@@ -5,9 +5,12 @@
 #-------------------------------------------------
 
 QT       -= gui
+QT       += network
 
 TARGET = server
 TEMPLATE = lib
+
+QMAKE_CXXFLAGS += -std=c++11
 
 DEFINES += SERVER_LIBRARY
 
@@ -24,3 +27,10 @@ unix:!symbian {
     }
     INSTALLS += target
 }
+
+win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../net_protocol/release/ -lnet_protocol
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../net_protocol/debug/ -lnet_protocol
+else:unix:!macx: LIBS += -L$$OUT_PWD/../net_protocol/ -lnet_protocol
+
+INCLUDEPATH += $$PWD/../net_protocol
+DEPENDPATH += $$PWD/../net_protocol

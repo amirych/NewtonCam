@@ -2,26 +2,68 @@
 #define SERVER_H
 
 #include "server_global.h"
+#include "netpacket.h"
 
 #include<iostream>
 #include<fstream>
 
-using namespace std;
+#include<QList>
+#include<QTcpServer>
+#include<QTcpSocket>
 
-class SERVERSHARED_EXPORT Server
+
+
+#define SERVER_DEFAULT_PORT 7777
+#define SERVER_DEFAULT_ALLOWED_HOST "127.0.0.1"
+
+
+            /*  Error codes from Server  */
+
+/*
+
+SERVER_ERROR_BUSY   - server already has connection from client
+SERVER_ERROR_DENIED - server denied connection (client IP is not in list of allowed)
+
+*/
+
+//using namespace std;
+
+class SERVERSHARED_EXPORT Server: public QTcpServer
 {
-
+    Q_OBJECT
 public:
-    Server();
+
+    enum ServerErrorCode {SERVER_ERROR_OK, SERVER_ERROR_BUSY, SERVER_ERROR_DENIED};
+
+    Server(QObject *parent = 0);
+    Server(quint16 port, QObject *parent = 0);
+    Server(QList<QHostAddress> &hosts, quint16 port = SERVER_DEFAULT_PORT, QObject *parent = 0);
+
     ~Server();
 
+
+signals:
+    void ServerError(QAbstractSocket::SocketError err_code);
+
+private slots:
+    void ClientConnection();
+    void ClientDisconnected();
+    void ReadClientStream();
+
+
 private:
-    inline void Call_Andor_API(unsigned int err_code, const char *file, int line,
-                               ostream &log_file = cerr);
+    QTcpSocket *clientSocket;
+    QList<QTcpSocket*> guiSocket;
 
+    quint16 serverPort;
+
+    QList<QHostAddress> allowed_hosts;
+
+    QAbstractSocket::SocketError lastServerError;
+
+    NetPacket *clientPacket;
+
+    void ExecuteCommand();
 };
-
-/* Andor API wrapper macro definition */
-#define API_CALL(err_code) { Server::Call_Andor_API((err_code), __FILE__, __LINE__); }
 
 #endif // SERVER_H

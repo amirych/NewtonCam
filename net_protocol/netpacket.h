@@ -2,44 +2,63 @@
 #define NETPACKET_H
 
 #include "net_protocol_global.h"
+#include "proto_defs.h"
 
 #include<QString>
 #include<QByteArray>
 #include<QVector>
+#include<QObject>
+#include<QtNetwork/QTcpSocket>
 
 
-
-typedef unsigned int netpacket_id_t; // packet ID type
+typedef unsigned int NetPacketID; // packet ID type
 typedef long status_t; // type of returned status of command execution
 
 
         /*  Base class for network protocol realization */
 
-class NET_PROTOCOLSHARED_EXPORT NetPacket
+class NET_PROTOCOLSHARED_EXPORT NetPacket: public QObject
 {
 
+    Q_OBJECT
 public:
-    NetPacket();
-    NetPacket(const netpacket_id_t id);
-    NetPacket(const netpacket_id_t id, const QString &content);
-    NetPacket(const netpacket_id_t id, const char *content);
 
-    void SetContent(const netpacket_id_t id, const QString &content);
-    void SetContent(const netpacket_id_t id, const char* content);
+    enum NetPacketID {PACKET_ID_INFO, PACKET_ID_CMD, PACKET_ID_TEMP, PACKET_ID_STATUS, PACKET_ID_HELLO};
+    enum NetPacketError {PACKET_ERROR_OK, PACKET_ERROR_NETWORK, PACKET_ERROR_UNKNOWN_PROTOCOL, PACKET_ERROR_CONTENT_LEN,
+                        PACKET_ERROR_BAD_NUMERIC, PACKET_ERROR_WAIT};
+
+    NetPacket();
+    NetPacket(const NetPacketID id);
+    NetPacket(const NetPacketID id, const QString &content);
+    NetPacket(const NetPacketID id, const char *content);
+
+    void SetContent(const NetPacketID id, const QString &content);
+    void SetContent(const NetPacketID id, const char* content);
 
     QByteArray GetByteView() const;
 
-    netpacket_id_t GetPacketID() const;
+    NetPacketID GetPacketID() const;
     QString GetPacketContent() const;
 
     bool isPacketValid() const;
+    NetPacketError GetPacketError() const;
+
+    bool Send(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
+
+signals:
+    void PacketReceived();
+
+public slots:
+    NetPacket* Receive(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
 
 private:
-    netpacket_id_t ID;
+    NetPacketID ID;
+    long Content_LEN;
     QString Content;
     QByteArray Packet;
 
     bool ValidPacket;
+    NetPacketError packetError;
 
     void MakePacket();
 };
