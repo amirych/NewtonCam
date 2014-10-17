@@ -156,6 +156,10 @@ NetPacket* NetPacket::Receive(QTcpSocket *socket, int timeout)
             return nullptr;
         }
 
+#ifdef QT_DEBUG
+        qDebug() << "NETPACKET: read header [" << Packet << "]";
+#endif
+
         long id_num = Packet.left(NETPROTOCOL_ID_FIELD_LEN).toLong(&ok);
         if (!ok) { // IT IS AN ERROR!!!
             packetError = PACKET_ERROR_BAD_NUMERIC;
@@ -170,12 +174,19 @@ NetPacket* NetPacket::Receive(QTcpSocket *socket, int timeout)
             return nullptr;
         }
 
+#ifdef QT_DEBUG
+        qDebug() << "NETPACKET: ID = " << ID << ", LEN = " << Content_LEN;
+#endif
+
         if ( Content_LEN < 0 ) { // IT IS AN ERROR!!!
             packetError = PACKET_ERROR_BAD_NUMERIC;
             return nullptr;
         }
 
-        if ( socket->bytesAvailable() < Content_LEN ) return nullptr; // waiting for entire packet content
+        if ( socket->bytesAvailable() < Content_LEN ) { // waiting for entire packet content
+            packetError = PACKET_ERROR_WAIT;
+            return nullptr;
+        }
 
     }
 
@@ -191,6 +202,11 @@ NetPacket* NetPacket::Receive(QTcpSocket *socket, int timeout)
         packetError = PACKET_ERROR_NETWORK;
         return nullptr;
     }
+
+
+#ifdef QT_DEBUG
+        qDebug() << "NETPACKET: content = [" << Packet << "]";
+#endif
 
     Content = Packet.data();
     ValidPacket = true;

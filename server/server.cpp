@@ -107,9 +107,15 @@ void Server::ClientConnection()
 
 void Server::ReadClientStream()
 {
-    if ( clientPacket->Receive(clientSocket) ) {
+#ifdef QT_DEBUG
+    qDebug() << "SERVER: reading client packet ...";
+#endif
+    if ( clientPacket->Receive(clientSocket) != nullptr ) {
         ExecuteCommand();
     }
+#ifdef QT_DEBUG
+    qDebug() << "SERVER: client packet is read";
+#endif
 }
 
 

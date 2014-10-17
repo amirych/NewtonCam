@@ -8,8 +8,8 @@
 #include<fstream>
 
 #include<QList>
-#include<QTcpServer>
-#include<QTcpSocket>
+#include<QtNetwork/QTcpServer>
+#include<QtNetwork/QTcpSocket>
 
 
 

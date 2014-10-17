@@ -5,4 +5,6 @@ SUBDIRS += \
     camera \
     server \
     test \
-    cam_caps
+    cam_caps \
+    client \
+    test_server
