@@ -107,10 +107,13 @@ void Server::ClientConnection()
 
 void Server::ReadClientStream()
 {
+    NetPacket *pk;
 #ifdef QT_DEBUG
     qDebug() << "SERVER: reading client packet ...";
 #endif
-    if ( clientPacket->Receive(clientSocket) != nullptr ) {
+    if ( (pk = clientPacket->Receive(clientSocket)) != nullptr ) {
+        delete clientPacket;
+        clientPacket = pk;
         ExecuteCommand();
     }
 #ifdef QT_DEBUG

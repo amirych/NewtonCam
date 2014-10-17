@@ -14,11 +14,13 @@ QMAKE_CXXFLAGS += -std=c++11
 
 DEFINES += NET_PROTOCOL_LIBRARY
 
-SOURCES += netpacket.cpp
+SOURCES += netpacket.cpp \
+    netpackethandler.cpp
 
 HEADERS += netpacket.h\
         net_protocol_global.h \
-    proto_defs.h
+    proto_defs.h \
+    netpackethandler.h
 
 unix:!symbian {
     maemo5 {

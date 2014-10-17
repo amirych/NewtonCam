@@ -35,7 +35,7 @@ public:
 
     enum ServerErrorCode {SERVER_ERROR_OK, SERVER_ERROR_BUSY, SERVER_ERROR_DENIED};
 
-    Server(QObject *parent = 0);
+    explicit Server(QObject *parent = 0);
     Server(quint16 port, QObject *parent = 0);
     Server(QList<QHostAddress> &hosts, quint16 port = SERVER_DEFAULT_PORT, QObject *parent = 0);
 

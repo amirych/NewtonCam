@@ -18,7 +18,7 @@ class CAMERASHARED_EXPORT Camera: public QObject
 {
     Q_OBJECT
 public:
-    Camera(QObject *parent = 0);
+    explicit Camera(QObject *parent = 0);
     Camera(long camera_index, QObject *parent = 0);
     Camera(std::ostream &log_file, long camera_index = 0, QObject *parent = 0);
 

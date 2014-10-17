@@ -11,7 +11,7 @@
 #include<QtNetwork/QTcpSocket>
 
 
-typedef unsigned int NetPacketID; // packet ID type
+//typedef unsigned int NetPacketID; // packet ID type
 typedef long status_t; // type of returned status of command execution
 
 

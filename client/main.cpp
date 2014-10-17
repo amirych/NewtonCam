@@ -14,6 +14,8 @@ int main(int argc, char *argv[])
     QString addr = "127.0.0.1";
     QTcpSocket s;
 
+    QObject::connect(&s,SIGNAL(disconnected()),&a,SLOT(quit()));
+
     s.connectToHost(addr,7777);
     if ( !s.waitForConnected() ) {
         exit(10);
@@ -25,6 +27,6 @@ int main(int argc, char *argv[])
 
 //    s.disconnectFromHost();
 
-    return 0;
-//    return a.exec();
+//    return 0;
+    return a.exec();
 }
