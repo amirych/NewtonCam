@@ -3,6 +3,7 @@
 
 #include "server_global.h"
 #include "netpacket.h"
+#include "netpackethandler.h"
 
 #include<iostream>
 #include<fstream>
@@ -48,7 +49,7 @@ signals:
 private slots:
     void ClientConnection();
     void ClientDisconnected();
-    void ReadClientStream();
+    void ExecuteCommand();
 
 
 private:
@@ -61,9 +62,7 @@ private:
 
     QAbstractSocket::SocketError lastServerError;
 
-    NetPacket *clientPacket;
-
-    void ExecuteCommand();
+    NetPacketHandler *packetHandler;
 };
 
 #endif // SERVER_H

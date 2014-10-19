@@ -17,7 +17,8 @@ static QList<QHostAddress> empty_hosts_list;
 
 Server::Server(QList<QHostAddress> &hosts, quint16 port, QObject *parent):
     QTcpServer(parent), serverPort(port), allowed_hosts(hosts),
-    guiSocket(QList<QTcpSocket*>()), clientSocket(nullptr), clientPacket(nullptr)
+    guiSocket(QList<QTcpSocket*>()), clientSocket(nullptr),
+    packetHandler(nullptr)
 {
     if ( allowed_hosts.isEmpty() ) { // set default host
         QString host = SERVER_DEFAULT_ALLOWED_HOST;
@@ -32,7 +33,11 @@ Server::Server(QList<QHostAddress> &hosts, quint16 port, QObject *parent):
         return;
     }
 
+    packetHandler = new NetPacketHandler(this);
+
     connect(this,SIGNAL(newConnection()),this,SLOT(ClientConnection()));
+
+    connect(packetHandler,SIGNAL(PacketIsReceived()),this,SLOT(ExecuteCommand()));
 }
 
 
@@ -49,7 +54,6 @@ Server::Server(QObject *parent): Server(empty_hosts_list, SERVER_DEFAULT_PORT, p
 
 Server::~Server()
 {
-    delete clientPacket;
 }
 
 
@@ -99,27 +103,11 @@ void Server::ClientConnection()
 
     connect(clientSocket,SIGNAL(disconnected()),this,SLOT(ClientDisconnected()));
 
-    clientPacket = new NetPacket();
+    packetHandler->SetSocket(clientSocket);
 
-    connect(clientSocket,SIGNAL(readyRead()),this,SLOT(ReadClientStream()));
+    connect(clientSocket,SIGNAL(readyRead()),packetHandler,SLOT(ReadDataStream()));
 }
 
-
-void Server::ReadClientStream()
-{
-    NetPacket *pk;
-#ifdef QT_DEBUG
-    qDebug() << "SERVER: reading client packet ...";
-#endif
-    if ( (pk = clientPacket->Receive(clientSocket)) != nullptr ) {
-        delete clientPacket;
-        clientPacket = pk;
-        ExecuteCommand();
-    }
-#ifdef QT_DEBUG
-    qDebug() << "SERVER: client packet is read";
-#endif
-}
 
 
 void Server::ClientDisconnected()
@@ -128,20 +116,21 @@ void Server::ClientDisconnected()
     qDebug() << "SERVER MSG: client from " << clientSocket->peerAddress() << " is disconnected!";
 #endif
 
-    clientSocket->disconnect(this,SLOT(ReadClientStream()));
+    clientSocket->disconnect(packetHandler,SLOT(ReadDataStream()));
 //    clientSocket->deleteLater();
     clientSocket = nullptr;
 
-    delete clientPacket;
-    clientPacket = nullptr;
 }
-
-
-                    /*  Private members  */
 
 
 void Server::ExecuteCommand()
 {
+    NetPacket *clientPacket = packetHandler->GetPacket();
+
+    if ( !clientPacket->isPacketValid() ) {
+        return;
+    }
+
     switch ( clientPacket->GetPacketID() ) {
     case NetPacket::PACKET_ID_INFO: {
         InfoNetPacket *pk = static_cast<InfoNetPacket*>(clientPacket);
@@ -161,6 +150,13 @@ void Server::ExecuteCommand()
 #ifdef QT_DEBUG
         qDebug() << "SERVER: CMD-packet has been recieved [" << pk->GetCmdName() << " -- "
                  << args << "] convert: " << ok;
+#endif
+
+        StatusNetPacket st(0,"OK");
+        ok = st.Send(clientSocket);
+
+#ifdef QT_DEBUG
+        qDebug() << "SERVER: send status [" << st.GetByteView() << "] status = " << ok;
 #endif
         break;
     }
@@ -186,3 +182,8 @@ void Server::ExecuteCommand()
     default: break;
     }
 }
+
+
+                /*  Private members  */
+
+

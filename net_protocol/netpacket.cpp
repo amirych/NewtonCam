@@ -2,6 +2,8 @@
 #include "proto_defs.h"
 
 #include<QTextStream>
+#include<QStringList>
+#include <iostream>
 
 
                 /************************************
@@ -131,126 +133,102 @@ void NetPacket::SetContent(const NetPacketID id, const QString &content)
 
 bool NetPacket::Send(QTcpSocket *socket, int timeout) // WARNING: THIS CALL BLOCKS CURRENT THREAD!!!
 {
+    if ( socket == nullptr ) {
+        packetError = NetPacket::PACKET_ERROR_NO_SOCKET;
+        return false;
+    }
+
     qint64 n = socket->write(Packet);
 
-    if ( n == -1 ) return false;
+    if ( n == -1 ) {
+        packetError = NetPacket::PACKET_ERROR_NETWORK;
+        return false;
+    }
 
     return socket->waitForBytesWritten(timeout);
 }
 
 
-NetPacket* NetPacket::Receive(QTcpSocket *socket, int timeout)
+//
+// This function is blocking a thread for <= timeout millisecs!!!
+//
+NetPacket& NetPacket::Receive(QTcpSocket *socket, int timeout)
 {
+
+    if ( socket == nullptr ) {
+        packetError = NetPacket::PACKET_ERROR_NO_SOCKET;
+        return *this;
+    }
+
     bool ok;
 
     if ( ValidPacket ) {
-        if ( socket->bytesAvailable() < (NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN) ) {
-            packetError = PACKET_ERROR_WAIT;
-            return nullptr;
+        while ( socket->bytesAvailable() < (NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN) ) {
+            if ( !socket->waitForReadyRead(timeout) ) {
+                packetError = NetPacket::PACKET_ERROR_WAIT;
+                return *this;
+            }
         }
         ValidPacket = false;
 
         Packet = socket->read(NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN);
         if ( Packet.size() < (NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN) ) { // IT IS AN ERROR!!!
             packetError = PACKET_ERROR_NETWORK;
-            return nullptr;
+            return *this;
         }
 
-#ifdef QT_DEBUG
+    #ifdef QT_DEBUG
         qDebug() << "NETPACKET: read header [" << Packet << "]";
-#endif
+    #endif
 
         long id_num = Packet.left(NETPROTOCOL_ID_FIELD_LEN).toLong(&ok);
         if (!ok) { // IT IS AN ERROR!!!
-            packetError = PACKET_ERROR_BAD_NUMERIC;
-            return nullptr;
+            packetError = PACKET_ERROR_UNKNOWN_PROTOCOL;
+            return *this;
         }
 
         ID = static_cast<NetPacket::NetPacketID>(id_num);
 
         Content_LEN = Packet.right(NETPROTOCOL_SIZE_FIELD_LEN).toLong(&ok);
         if (!ok) { // IT IS AN ERROR!!!
-            packetError = PACKET_ERROR_BAD_NUMERIC;
-            return nullptr;
+            packetError = PACKET_ERROR_UNKNOWN_PROTOCOL;
+            return *this;
         }
 
-#ifdef QT_DEBUG
+    #ifdef QT_DEBUG
         qDebug() << "NETPACKET: ID = " << ID << ", LEN = " << Content_LEN;
-#endif
+    #endif
 
         if ( Content_LEN < 0 ) { // IT IS AN ERROR!!!
             packetError = PACKET_ERROR_BAD_NUMERIC;
-            return nullptr;
+            return *this;
         }
-
-        if ( socket->bytesAvailable() < Content_LEN ) { // waiting for entire packet content
-            packetError = PACKET_ERROR_WAIT;
-            return nullptr;
-        }
-
     }
 
-    // at least ID, LEN and part of CONTENT fields are already should be read
-
-    if ( socket->bytesAvailable() < Content_LEN ) { // waiting for entire packet content
-        packetError = PACKET_ERROR_WAIT;
-        return nullptr;
+    while ( socket->bytesAvailable() < Content_LEN ) { // waiting for entire packet content
+        if ( !socket->waitForReadyRead(timeout) ) {
+            packetError = NetPacket::PACKET_ERROR_WAIT;
+            return *this;
+        }
     }
-    Packet = socket->read(Content_LEN);
 
-    if ( Packet.size() < Content_LEN ) { // IT IS AN ERROR!!!
+    Packet += socket->read(Content_LEN);
+
+    if ( Packet.size() < (Content_LEN + NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN) ) { // IT IS AN ERROR!!!
         packetError = PACKET_ERROR_NETWORK;
-        return nullptr;
+        return *this;
     }
 
+    Content = Packet.right(Content_LEN).data();
 
 #ifdef QT_DEBUG
         qDebug() << "NETPACKET: content = [" << Packet << "]";
 #endif
 
-    Content = Packet.data();
     ValidPacket = true;
     packetError = PACKET_ERROR_OK;
 
-    // parse content
-    switch (ID) {
-    case PACKET_ID_INFO: {
-        InfoNetPacket *pk = new InfoNetPacket(Content);
-        return pk;
-    }
-    case PACKET_ID_CMD: {
-        QString cmd, args;
-
-        split_content(Content,cmd,args);
-
-        CmdNetPacket *pk = new CmdNetPacket(cmd,args);
-        return pk;
-    }
-    case PACKET_ID_STATUS: {
-        QString err_no_str, err_str;
-        status_t err_no;
-
-        split_content(Content,err_no_str,err_str);
-
-        bool ok;
-
-        err_no = err_no_str.toLong(&ok);
-        if ( !ok ) {
-            ValidPacket = false;
-            packetError = PACKET_ERROR_BAD_NUMERIC;
-            return nullptr;
-        }
-
-        return new StatusNetPacket(err_no,err_str);
-    }
-    case PACKET_ID_HELLO: {
-        return new NetPacket(PACKET_ID_HELLO,Content);
-    }
-    default:
-        ValidPacket = false;
-        packetError = PACKET_ERROR_UNKNOWN_PROTOCOL;
-        return nullptr;
-    }
+    return *this;
 }
 
 
@@ -295,6 +273,12 @@ void InfoNetPacket::SetInfo(const QString &info){
 }
 
 
+InfoNetPacket& InfoNetPacket::Receive(QTcpSocket *socket, int timeout)
+{
+    NetPacket::Receive(socket,timeout);
+
+    return *this;
+}
 
                 /***************************************
                 *                                      *
@@ -362,6 +346,22 @@ CmdNetPacket::CmdNetPacket(const QString &cmdname, const QVector<double> &args):
 CmdNetPacket::CmdNetPacket(): CmdNetPacket("","")
 {
 
+}
+
+
+CmdNetPacket::CmdNetPacket(const NetPacket &packet): NetPacket(NetPacket::PACKET_ID_CMD)
+{
+    SetContent(NetPacket::PACKET_ID_CMD,packet.GetPacketContent());
+    ParseContent();
+}
+
+
+CmdNetPacket& CmdNetPacket::operator =(const NetPacket &packet)
+{
+    SetContent(NetPacket::PACKET_ID_CMD,packet.GetPacketContent());
+    ParseContent();
+
+    return *this;
 }
 
 
@@ -506,16 +506,47 @@ bool CmdNetPacket::GetCmdArgs(double *args)
 
 bool CmdNetPacket::GetCmdArgs(QVector<double> *args)
 {
-    *args = ArgsVec;
+    if ( args == nullptr ) return false;
 
-    if ( ArgsVec.isEmpty() ) {
-        return false;
+    if ( ArgsVec.isEmpty() ) { // may be packet was just read from network, then try to re-parse content
+        bool ok;
+        double num;
+
+        QStringList str_vec = Args.split(NETPROTOCOL_CONTENT_DELIMETER,QString::SkipEmptyParts);
+        if ( str_vec.isEmpty() ) return false;
+
+        foreach (QString num_str, str_vec) {
+            num = num_str.toDouble(&ok);
+            if ( !ok ) {
+                ArgsVec.clear();
+                return false;
+            }
+            ArgsVec << num;
+        }
     }
+
+    *args = ArgsVec;
 
     return true;
 }
 
 
+void CmdNetPacket::ParseContent()
+{
+    ArgsVec.clear();
+
+    split_content(Content,CmdName,Args);
+}
+
+CmdNetPacket& CmdNetPacket::Receive(QTcpSocket *socket, int timeout)
+{
+    NetPacket::Receive(socket,timeout);
+    if ( !ValidPacket ) return *this;
+
+    ParseContent();
+
+    return *this;
+}
 
                 /******************************************
                 *                                         *
@@ -549,6 +580,22 @@ StatusNetPacket::StatusNetPacket():
     StatusNetPacket(NETPROTOCOL_ERROR_UNKNOWN,"")
 {
 
+}
+
+
+StatusNetPacket::StatusNetPacket(const NetPacket &packet): NetPacket(NetPacket::PACKET_ID_STATUS)
+{
+    SetContent(NetPacket::PACKET_ID_STATUS,packet.GetPacketContent());
+    ParseContent();
+}
+
+
+StatusNetPacket& StatusNetPacket::operator =(const NetPacket &packet)
+{
+    SetContent(NetPacket::PACKET_ID_STATUS,packet.GetPacketContent());
+    ParseContent();
+
+    return *this;
 }
 
 
@@ -586,4 +633,128 @@ status_t StatusNetPacket::GetStatus(QString *err_str) const
 {
     *err_str = Err_string;
     return Err_Code;
+}
+
+
+void StatusNetPacket::ParseContent()
+{
+    QString err_no_str;
+
+    split_content(Content,err_no_str,Err_string);
+
+    bool ok;
+
+    Err_Code = err_no_str.toLong(&ok);
+    if ( !ok ) {
+        ValidPacket = false;
+        packetError = PACKET_ERROR_BAD_NUMERIC;
+    }
+
+    ValidPacket = true;
+}
+
+StatusNetPacket& StatusNetPacket::Receive(QTcpSocket *socket, int timeout)
+{
+    NetPacket::Receive(socket,timeout);
+    if ( !ValidPacket ) return *this;
+
+    ParseContent();
+
+    return *this;
+}
+
+
+                /****************************************
+                *                                       *
+                *   TempNetPacket class implementation  *
+                *                                       *
+                ****************************************/
+
+
+TempNetPacket::TempNetPacket(const double temp, const unsigned int cooling_status):
+    NetPacket(NetPacket::PACKET_ID_TEMP), Temp(temp), CoollingStatus(cooling_status)
+{
+    QString str;
+    QTextStream st(&str);
+
+    st << Temp << NETPROTOCOL_CONTENT_DELIMETER << CoollingStatus;
+
+    SetContent(NetPacket::PACKET_ID_TEMP,str);
+}
+
+
+TempNetPacket::TempNetPacket(): TempNetPacket(0.0,0)
+{
+
+}
+
+
+TempNetPacket::TempNetPacket(const NetPacket &packet): NetPacket(NetPacket::PACKET_ID_TEMP)
+{
+    SetContent(NetPacket::PACKET_ID_TEMP,packet.GetPacketContent());
+    ParseContent();
+}
+
+
+TempNetPacket& TempNetPacket::operator =(const NetPacket &packet)
+{
+    Content = packet.GetPacketContent();
+    ParseContent();
+
+    return *this;
+}
+
+
+void TempNetPacket::SetTemp(const double temp, const unsigned int cooling_status)
+{
+    Temp = temp;
+    CoollingStatus = cooling_status;
+}
+
+
+double TempNetPacket::GetTemp(unsigned int *cooling_status) const
+{
+    *cooling_status = CoollingStatus;
+    return Temp;
+}
+
+
+void TempNetPacket::ParseContent()
+{
+    QStringList vals = Content.split(NETPROTOCOL_CONTENT_DELIMETER, QString::SkipEmptyParts);
+
+    if ( vals.empty() ) {
+        packetError = NetPacket::PACKET_ERROR_BAD_NUMERIC;
+        return;
+    }
+
+    bool ok;
+
+    Temp = vals[0].toDouble(&ok);
+    if ( !ok ) {
+        packetError = NetPacket::PACKET_ERROR_BAD_NUMERIC;
+        return;
+    }
+
+    if ( vals.length() > 1 ) {
+        CoollingStatus = vals[1].toUInt(&ok);
+        if ( !ok ) {
+            packetError = NetPacket::PACKET_ERROR_BAD_NUMERIC;
+            return;
+        }
+    } else CoollingStatus = 0;
+
+    packetError = NetPacket::PACKET_ERROR_OK;
+}
+
+
+TempNetPacket& TempNetPacket::Receive(QTcpSocket *socket, int timeout)
+{
+    NetPacket::Receive(socket, timeout);
+
+    if ( !ValidPacket ) return *this;
+
+    ParseContent();
+
+    return *this;
 }

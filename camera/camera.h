@@ -24,7 +24,36 @@ public:
 
     ~Camera();
 
+    void InitCamera(long camera_index = 0);
+    void InitCamera(std::ostream &log_file, long camera_index = 0);
+
     unsigned int GetLastError() const;
+
+    // Temperature and cooler control
+
+    void SetCoolerON();
+    void SetCoolerOFF();
+
+    void SetTemperature(const int temp);
+
+    void GetTemperature(float *temp, unsigned int *cooler_stat);
+
+    // frame control
+
+    void SetImage(const int hbin, const int vbin,
+                  const int xstart, const int xend, const int ystart, const int yend);
+
+    // acquisition control
+
+    // read-out speed
+
+    // gain control
+
+
+    // shutter control
+
+    void ShutterOpen();
+    void ShutterClose();
 
 signals:
     void CameraError(unsigned int err_code);

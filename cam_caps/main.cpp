@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
 
         CALL_API(GetNumberADChannels,&numADchans);
 
-        cout << "Number of AD channrls: " << numADchans << endl;
+        cout << "Number of AD channels: " << numADchans << endl;
 
         CALL_API(GetNumberAmp,&numAmp);
 

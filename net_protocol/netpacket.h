@@ -17,15 +17,15 @@ typedef long status_t; // type of returned status of command execution
 
         /*  Base class for network protocol realization */
 
-class NET_PROTOCOLSHARED_EXPORT NetPacket: public QObject
+class NET_PROTOCOLSHARED_EXPORT NetPacket
 {
-
-    Q_OBJECT
 public:
 
-    enum NetPacketID {PACKET_ID_INFO, PACKET_ID_CMD, PACKET_ID_TEMP, PACKET_ID_STATUS, PACKET_ID_HELLO};
-    enum NetPacketError {PACKET_ERROR_OK, PACKET_ERROR_NETWORK, PACKET_ERROR_UNKNOWN_PROTOCOL, PACKET_ERROR_CONTENT_LEN,
-                        PACKET_ERROR_BAD_NUMERIC, PACKET_ERROR_WAIT};
+    enum NetPacketID {PACKET_ID_INFO, PACKET_ID_CMD, PACKET_ID_TEMP,
+                      PACKET_ID_STATUS, PACKET_ID_HELLO, PACKET_ID_UNKNOWN};
+    enum NetPacketError {PACKET_ERROR_OK, PACKET_ERROR_NETWORK, PACKET_ERROR_NO_SOCKET,
+                         PACKET_ERROR_UNKNOWN_PROTOCOL, PACKET_ERROR_CONTENT_LEN,
+                         PACKET_ERROR_BAD_NUMERIC, PACKET_ERROR_WAIT};
 
     NetPacket();
     NetPacket(const NetPacketID id);
@@ -45,13 +45,9 @@ public:
 
     bool Send(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
 
-signals:
-    void PacketReceived();
+    NetPacket& Receive(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
 
-public slots:
-    NetPacket* Receive(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
-
-private:
+protected:
     NetPacketID ID;
     long Content_LEN;
     QString Content;
@@ -77,6 +73,8 @@ public:
     void SetInfo(const char* info);
 
     QString GetInfo() const;
+
+    InfoNetPacket& Receive(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
 };
 
 
@@ -96,6 +94,10 @@ public:
     CmdNetPacket(const QString &cmdname, const QVector<double> &args);
     CmdNetPacket(const char* cmdname, const QVector<double> &args);
 
+    CmdNetPacket(const NetPacket &packet);
+
+    CmdNetPacket& operator=(const NetPacket &packet);
+
     void SetCommand(const QString &cmdname, const QString &args);
     void SetCommand(const char* cmdname, const char* args);
     void SetCommand(const QString &cmdname, const char* args);
@@ -112,6 +114,8 @@ public:
     bool GetCmdArgs(double *args);
     bool GetCmdArgs(QVector<double> *args);
 
+    CmdNetPacket& Receive(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
+
 private:
     QString CmdName;
     QString Args;
@@ -120,6 +124,8 @@ private:
     void Init();
     void Init(const double arg);
     void Init(const QVector<double> &args);
+
+    void ParseContent();
 };
 
 
@@ -132,16 +138,46 @@ public:
     StatusNetPacket(const status_t err_no, const QString &err_str);
     StatusNetPacket(const status_t err_no, const char* err_str);
 
+    StatusNetPacket(const NetPacket &packet);
+
+    StatusNetPacket& operator=(const NetPacket &packet);
+
     void SetStatus(const status_t err_no, const QString &err_str = "");
     void SetStatus(const status_t err_no, const char* err_str = 0);
 
     status_t GetStatus(QString *err_str = 0) const;
+
+    StatusNetPacket& Receive(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
 
 private:
     status_t Err_Code;
     QString Err_string;
 
     void Init();
+    void ParseContent();
+};
+
+
+class NET_PROTOCOLSHARED_EXPORT TempNetPacket: public NetPacket
+{
+public:
+    TempNetPacket();
+    TempNetPacket(const double temp, const unsigned int cooling_status);
+
+    TempNetPacket(const NetPacket &packet);
+
+    TempNetPacket& operator=(const NetPacket &packet);
+
+    void SetTemp(const double temp, const unsigned int cooling_status);
+
+    double GetTemp(unsigned int *cooling_status = 0) const;
+
+    TempNetPacket& Receive(QTcpSocket *socket, int timeout = NETPROTOCOL_TIMEOUT);
+private:
+    double Temp; // temperature
+    unsigned int CoollingStatus;
+
+    void ParseContent();
 };
 
 #endif // NETPACKET_H

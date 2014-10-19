@@ -63,10 +63,22 @@ Camera::~Camera()
 
             /*  public methods  */
 
+void Camera::InitCamera(long camera_index)
+{
+
+}
+
 unsigned int Camera::GetLastError() const
 {
     return lastError;
 }
+
+
+void Camera::SetCoolerOFF()
+{
+    ANDOR_API_CALL(CoolerOFF,);
+}
+
 
             /*  public slots  */
 
