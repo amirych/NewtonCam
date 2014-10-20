@@ -47,7 +47,7 @@ Server::Server(quint16 port, QObject *parent): Server(empty_hosts_list, port, pa
 }
 
 
-Server::Server(QObject *parent): Server(empty_hosts_list, SERVER_DEFAULT_PORT, parent)
+Server::Server(QObject *parent): Server(empty_hosts_list, NETPROTOCOL_DEFAULT_PORT, parent)
 {
 }
 

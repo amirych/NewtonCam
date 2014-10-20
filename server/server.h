@@ -14,7 +14,7 @@
 
 
 
-#define SERVER_DEFAULT_PORT 7777
+//#define SERVER_DEFAULT_PORT 7777
 #define SERVER_DEFAULT_ALLOWED_HOST "127.0.0.1"
 
 
@@ -38,7 +38,7 @@ public:
 
     explicit Server(QObject *parent = 0);
     Server(quint16 port, QObject *parent = 0);
-    Server(QList<QHostAddress> &hosts, quint16 port = SERVER_DEFAULT_PORT, QObject *parent = 0);
+    Server(QList<QHostAddress> &hosts, quint16 port = NETPROTOCOL_DEFAULT_PORT, QObject *parent = 0);
 
     ~Server();
 
