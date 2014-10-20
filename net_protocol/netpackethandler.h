@@ -10,7 +10,7 @@
 #include <QList>
 #include <QString>
 
-class NetPacketHandler : public QObject
+class NET_PROTOCOLSHARED_EXPORT NetPacketHandler : public QObject
 {
     Q_OBJECT
 public:
