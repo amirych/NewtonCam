@@ -75,6 +75,12 @@ NetPacketHandler::NetPacketHandlerError NetPacketHandler::GetLastError() const
     return lastError;
 }
 
+
+void NetPacketHandler::Reset()
+{
+    packet->SetContent(NetPacket::PACKET_ID_UNKNOWN,""); // discard all previous received data in packet (e.g. an error occured on socket)
+}
+
                 /*  Public slots  */
 
 void NetPacketHandler::ReadDataStream()
@@ -85,7 +91,7 @@ void NetPacketHandler::ReadDataStream()
     }
 
     packet->Receive(current_socket,10);
-    if ( packet->GetPacketError() == NetPacket::PACKET_ERROR_WAIT ) return;
+    if ( packet->GetPacketError() == NetPacket::PACKET_ERROR_WAIT ) return; // wait for new data
 
     if ( packet->GetPacketError() != NetPacket::PACKET_ERROR_OK ) {
         packet_queue << packet;
@@ -113,7 +119,8 @@ void NetPacketHandler::ReadDataStream()
         break;
     }
     case NetPacket::PACKET_ID_HELLO: {
-        packet_queue << packet;
+        HelloNetPacket *pk = new HelloNetPacket(*packet);
+        packet_queue << pk;
         break;
     }
     default:

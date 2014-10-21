@@ -1,5 +1,6 @@
 #include "netpacket.h"
 #include "proto_defs.h"
+#include "../server/server.h"
 
 #include <QCoreApplication>
 #include <QTcpSocket>
@@ -18,8 +19,24 @@
 #define CLIENT_DEFAULT_SERVER_IP "127.0.0.1"
 
 // client errors
-#define CLIENT_ERROR_INVALID_OPTION 10
-#define CLIENT_ERROR_CONNECTION 11
+
+enum ClientError {CLIENT_ERROR_OK, CLIENT_ERROR_INVALID_OPTION = 10, CLIENT_ERROR_CONNECTION,
+                  CLIENT_ERROR_UNKNOWN_SERVER, CLIENT_ERROR_INVALID_SERVER_STATUS};
+
+
+// get server status macro
+
+#define SERVER_STATUS {\
+    server_status_packet.Receive(&socket,NETPROTOCOL_TIMEOUT); \
+    if ( !server_status_packet.isPacketValid() ) { \
+        qDebug() << "BAD SERVER STATUS PACKET!"; \
+        return CLIENT_ERROR_CONNECTION; \
+    } \
+    if ( (status = server_status_packet.GetStatus()) != Server::SERVER_ERROR_OK ) {\
+        return status; \
+    } \
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -78,14 +95,6 @@ int main(int argc, char *argv[])
 
     cmdline_parser.process(a);
 
-    QString bb = cmdline_parser.value(binOption);
-    QString gg = cmdline_parser.value(roiOption);
-
-    QStringList aa = cmdline_parser.positionalArguments();
-
-    qDebug() << "   BIN: " << bb << "\n";
-    qDebug() << "   ROI: " << gg << "\n";
-    qDebug() << "   ARGS: " << aa;
 
     // is client was run without arguments and options
     if ( a.arguments().length() == 1 ) {
@@ -95,12 +104,14 @@ int main(int argc, char *argv[])
 
     /*  Parsing some command-line options  */
 
+    bool ok;
+
     // binning
     QString bin_str = cmdline_parser.value(binOption);
     QVector<double> bin_vals;
     if ( !bin_str.isEmpty() ) {
         QRegExp rx("\\s*\\d+x\\d+\\s*"); // binning string must be in format XBINxYBIN
-        bool ok = rx.exactMatch(bin_str);
+        ok = rx.exactMatch(bin_str);
         if ( !ok ) {
             qDebug() << "BAD BIN!";
             return CLIENT_ERROR_INVALID_OPTION;
@@ -114,7 +125,7 @@ int main(int argc, char *argv[])
     QVector<double> roi_vals;
     if ( !roi_str.isEmpty() ) {
         QRegExp rx("\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s*");
-        bool ok = rx.exactMatch(roi_str);
+        ok = rx.exactMatch(roi_str);
         if ( !ok ) {
             qDebug() << "BAD ROI!";
             return CLIENT_ERROR_INVALID_OPTION;
@@ -128,7 +139,6 @@ int main(int argc, char *argv[])
     QString exp_str = cmdline_parser.value(expOption);
     double exp_time;
     if ( !exp_str.isEmpty() ) {
-        bool ok;
         exp_time = exp_str.toDouble(&ok);
         if (!ok || (exp_time < 0.0) ){
             qDebug() << "BAD EXP TIME!";
@@ -140,7 +150,6 @@ int main(int argc, char *argv[])
     QString temp_str = cmdline_parser.value(tempOption);
     double ccd_temp;
     if ( !temp_str.isEmpty() ) {
-        bool ok;
         ccd_temp = temp_str.toDouble(&ok);
         if ( !ok ) {
             qDebug() << "BAD TEMPERATURE!";
@@ -170,25 +179,74 @@ int main(int argc, char *argv[])
         return CLIENT_ERROR_CONNECTION;
     }
 
+
+    HelloNetPacket hello;
+    StatusNetPacket server_status_packet;
+    status_t status;
+
+                /*   Receive HELLO message from server   */
+
+    hello.Receive(&socket,NETPROTOCOL_TIMEOUT);
+    if ( !hello.isPacketValid() ) {
+        socket.disconnectFromHost();
+        return CLIENT_ERROR_CONNECTION;
+    }
+
+    if ( hello.GetSenderType() != NETPROTOCOL_SENDER_TYPE_SERVER ) {
+        socket.disconnectFromHost();
+        return CLIENT_ERROR_UNKNOWN_SERVER;
+    }
+#ifdef QT_DEBUG
+    qDebug() << "Received HELLO from server: " << hello.GetSenderType();
+#endif
+
+                /*  Send HELLO message  */
+
+    hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_CLIENT,"");
+    ok = hello.Send(&socket,NETPROTOCOL_TIMEOUT);
+    if ( !ok ) {
+        return CLIENT_ERROR_CONNECTION;
+    }
+    SERVER_STATUS;
+
                 /*  Send commands to server  */
 
     CmdNetPacket command_packet;
-    StatusNetPacket server_status_packet;
-    status_t status;
 
     // --stop
 
     if ( cmdline_parser.isSet(stopOption) ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_STOP,"");
         command_packet.Send(&socket,NETPROTOCOL_TIMEOUT);
-        server_status_packet.Receive(&socket,NETPROTOCOL_TIMEOUT);
-        if ( !server_status_packet.isPacketValid() ) {
-            qDebug() << "BAD SERVER STATUS PACKET!";
-            return CLIENT_ERROR_CONNECTION;
-        }
-        status = server_status_packet.GetStatus();
+        SERVER_STATUS;
     }
 
+
+    // --init
+    if ( cmdline_parser.isSet(initOption) ) {
+
+    }
+
+
+    // --bin (-b)
+
+    if ( cmdline_parser.value(binOption) != "" ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_BINNING,bin_vals);
+        ok = command_packet.Send(&socket,NETPROTOCOL_TIMEOUT);
+        SERVER_STATUS;
+#ifdef QT_DEBUG
+        qDebug() << "CLIENT: server answer: " << status;
+#endif
+    }
+
+    //
+#ifdef QT_DEBUG
+    qDebug() << "Disconnect from server";
+#endif
+
+    socket.disconnectFromHost();
+
+    return CLIENT_ERROR_OK;
 
     CmdNetPacket pk("EXP",2.57);
     InfoNetPacket ipk("This is the test client!!!");
@@ -198,7 +256,6 @@ int main(int argc, char *argv[])
 
     QObject::connect(&s,SIGNAL(disconnected()),&a,SLOT(quit()));
 
-//    s.connectToHost(addr,7777);
     s.connectToHost(server_ip,server_port);
     if ( !s.waitForConnected() ) {
         std::cerr << "Cannot connect to server!\n";
@@ -207,7 +264,6 @@ int main(int argc, char *argv[])
 
     StatusNetPacket st;
     NetPacket pp;
-    bool ok;
     for ( long i = 0; i < 10; ++i ) {
         std::cerr << "------------(" << i << ")-----------------\n";
         ok = pk.Send(&s);

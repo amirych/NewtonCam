@@ -23,6 +23,13 @@
 #define NETPROTOCOL_ERROR_UNKNOWN_PROTOCOL 1001
 #define NETPROTOCOL_ERROR_CONTENT_LEN 1002       // content length is greater than permitted
 
+
+            /*  Sender types  */
+
+#define NETPROTOCOL_SENDER_TYPE_SERVER "NEWTON-SERVER"
+#define NETPROTOCOL_SENDER_TYPE_CLIENT "NEWTON-CLIENT"
+#define NETPROTOCOL_SENDER_TYPE_GUI    "NEWTON-GUI"
+
             /*  Protocol commands    */
 
 #define NETPROTOCOL_COMMAND_INIT     "INIT"     // initialize camera

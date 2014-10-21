@@ -34,7 +34,9 @@ class SERVERSHARED_EXPORT Server: public QTcpServer
     Q_OBJECT
 public:
 
-    enum ServerErrorCode {SERVER_ERROR_OK, SERVER_ERROR_BUSY, SERVER_ERROR_DENIED};
+    enum ServerErrorCode {SERVER_ERROR_OK, SERVER_ERROR_BUSY, SERVER_ERROR_DENIED,
+                          SERVER_ERROR_CONNECTION, SERVER_ERROR_UNKNOWN_CLIENT,
+                          SERVER_ERROR_UNKNOWN_COMMAND, SERVER_ERROR_INVALID_ARGS};
 
     explicit Server(QObject *parent = 0);
     Server(quint16 port, QObject *parent = 0);
@@ -42,9 +44,11 @@ public:
 
     ~Server();
 
-
+    void SetNetworkTimeout(const int timeout);
 signals:
     void ServerError(QAbstractSocket::SocketError err_code);
+    void HelloIsReceived(QString hello);
+    void InfoIsReceived(QString info);
 
 private slots:
     void ClientConnection();
@@ -55,6 +59,8 @@ private slots:
 private:
     QTcpSocket *clientSocket;
     QList<QTcpSocket*> guiSocket;
+
+    int NetworkTimeout;
 
     quint16 serverPort;
 

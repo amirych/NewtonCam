@@ -32,6 +32,8 @@ public:
 
     NetPacketHandlerError GetLastError() const;
 
+    void Reset();
+
 signals:
     void PacketIsReceived();
     void PacketIsSent();

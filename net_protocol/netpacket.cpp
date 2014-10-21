@@ -277,6 +277,13 @@ InfoNetPacket& InfoNetPacket::Receive(QTcpSocket *socket, int timeout)
 {
     NetPacket::Receive(socket,timeout);
 
+    if ( !ValidPacket ) return *this;
+
+    if ( ID != NetPacket::PACKET_ID_INFO ) {
+        ValidPacket = false;
+        packetError = NetPacket::PACKET_ERROR_ID_MISMATCH;
+    }
+
     return *this;
 }
 
@@ -543,6 +550,12 @@ CmdNetPacket& CmdNetPacket::Receive(QTcpSocket *socket, int timeout)
     NetPacket::Receive(socket,timeout);
     if ( !ValidPacket ) return *this;
 
+    if ( ID != NetPacket::PACKET_ID_CMD ) {
+        ValidPacket = false;
+        packetError = NetPacket::PACKET_ERROR_ID_MISMATCH;
+        return *this;
+    }
+
     ParseContent();
 
     return *this;
@@ -631,7 +644,7 @@ void StatusNetPacket::SetStatus(const status_t err_no, const char *err_str)
 
 status_t StatusNetPacket::GetStatus(QString *err_str) const
 {
-    *err_str = Err_string;
+    if ( err_str != nullptr ) *err_str = Err_string;
     return Err_Code;
 }
 
@@ -657,6 +670,12 @@ StatusNetPacket& StatusNetPacket::Receive(QTcpSocket *socket, int timeout)
 {
     NetPacket::Receive(socket,timeout);
     if ( !ValidPacket ) return *this;
+
+    if ( ID != NetPacket::PACKET_ID_STATUS) {
+        ValidPacket = false;
+        packetError = NetPacket::PACKET_ERROR_ID_MISMATCH;
+        return *this;
+    }
 
     ParseContent();
 
@@ -714,7 +733,7 @@ void TempNetPacket::SetTemp(const double temp, const unsigned int cooling_status
 
 double TempNetPacket::GetTemp(unsigned int *cooling_status) const
 {
-    *cooling_status = CoollingStatus;
+    if ( cooling_status != nullptr ) *cooling_status = CoollingStatus;
     return Temp;
 }
 
@@ -753,6 +772,141 @@ TempNetPacket& TempNetPacket::Receive(QTcpSocket *socket, int timeout)
     NetPacket::Receive(socket, timeout);
 
     if ( !ValidPacket ) return *this;
+
+    if ( ID != NetPacket::PACKET_ID_TEMP ) {
+        ValidPacket = false;
+        packetError = NetPacket::PACKET_ERROR_ID_MISMATCH;
+        return *this;
+    }
+
+    ParseContent();
+
+    return *this;
+}
+
+
+                /*****************************************
+                *                                        *
+                *   HelloNetPacket class implementation  *
+                *                                        *
+                *****************************************/
+
+HelloNetPacket::HelloNetPacket(const QString &sender_type, const QString &version):
+    NetPacket(NetPacket::PACKET_ID_HELLO), SenderType(sender_type), SenderVersion(version)
+{
+    if ( SenderVersion.isEmpty() ) SetContent(NetPacket::PACKET_ID_HELLO,SenderType);
+    else SetContent(NetPacket::PACKET_ID_HELLO,SenderType + NETPROTOCOL_CONTENT_DELIMETER + SenderVersion);
+}
+
+
+HelloNetPacket::HelloNetPacket(const char *sender_type, const char *version):
+    HelloNetPacket(QString(sender_type),QString(version))
+{
+
+}
+
+
+HelloNetPacket::HelloNetPacket(const char *sender_type, const QString &version):
+    HelloNetPacket(QString(sender_type),version)
+{
+
+}
+
+
+HelloNetPacket::HelloNetPacket(const QString &sender_type, const char *version):
+    HelloNetPacket(sender_type,QString(version))
+{
+
+}
+
+
+HelloNetPacket::HelloNetPacket(): HelloNetPacket("","")
+{
+
+}
+
+
+HelloNetPacket::HelloNetPacket(const NetPacket &packet): NetPacket(NetPacket::PACKET_ID_HELLO,"")
+{
+    Content = packet.GetPacketContent();
+
+    ParseContent();
+}
+
+
+HelloNetPacket& HelloNetPacket::operator = (const NetPacket &packet)
+{
+    Content = packet.GetPacketContent();
+
+    ParseContent();
+
+    return *this;
+}
+
+
+void HelloNetPacket::SetSenderType(const QString &sender_type, const QString &version)
+{
+    SenderType = sender_type;
+    SenderVersion = version;
+
+    SetContent(NetPacket::PACKET_ID_HELLO,SenderType + NETPROTOCOL_CONTENT_DELIMETER + SenderVersion);
+}
+
+
+void HelloNetPacket::SetSenderType(const char *sender_type, const char *version)
+{
+    SetSenderType(QString(sender_type),QString(version));
+}
+
+
+void HelloNetPacket::SetSenderType(const QString &sender_type, const char *version)
+{
+    SetSenderType(sender_type,QString(version));
+}
+
+
+void HelloNetPacket::SetSenderType(const char *sender_type, const QString &version)
+{
+    SetSenderType(QString(sender_type),version);
+}
+
+
+QString HelloNetPacket::GetSenderType(QString *version) const
+{
+    if (version != nullptr ) *version = SenderVersion;
+    return SenderType;
+}
+
+
+void HelloNetPacket::ParseContent()
+{
+    QString str = Content.trimmed();
+
+    int idx = str.indexOf(NETPROTOCOL_CONTENT_DELIMETER);
+
+    if ( idx != -1 ) {
+        SenderType = str.left(idx);
+        SenderVersion = str.right(str.length()-idx-1);
+    } else {
+        SenderType = str;
+        SenderVersion = "";
+    }
+
+    packetError = NetPacket::PACKET_ERROR_OK;
+}
+
+
+HelloNetPacket& HelloNetPacket::Receive(QTcpSocket *socket, int timeout)
+{
+    NetPacket::Receive(socket,timeout);
+
+    if ( !ValidPacket ) return *this;
+
+    if ( ID != NetPacket::PACKET_ID_HELLO ) {
+        ValidPacket = false;
+        packetError = NetPacket::PACKET_ERROR_ID_MISMATCH;
+        return *this;
+    }
 
     ParseContent();
 
