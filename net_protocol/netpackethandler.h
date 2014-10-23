@@ -27,6 +27,8 @@ public:
     void SetSocket(QTcpSocket *socket);
 
     bool SendPacket(NetPacket *packet, int timeout = NETPROTOCOL_TIMEOUT);
+    bool SendPacket(QList<QTcpSocket*> *queue, NetPacket* packet, int timeout = NETPROTOCOL_TIMEOUT);
+
 
     NetPacket* GetPacket(); // extract first received packet from a queue and return it to caller
 

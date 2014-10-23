@@ -177,9 +177,9 @@ NetPacket& NetPacket::Receive(QTcpSocket *socket, int timeout)
             return *this;
         }
 
-    #ifdef QT_DEBUG
-        qDebug() << "NETPACKET: read header [" << Packet << "]";
-    #endif
+//    #ifdef QT_DEBUG
+//        qDebug() << "NETPACKET: read header [" << Packet << "]";
+//    #endif
 
         long id_num = Packet.left(NETPROTOCOL_ID_FIELD_LEN).toLong(&ok);
         if (!ok) { // IT IS AN ERROR!!!
@@ -195,9 +195,9 @@ NetPacket& NetPacket::Receive(QTcpSocket *socket, int timeout)
             return *this;
         }
 
-    #ifdef QT_DEBUG
-        qDebug() << "NETPACKET: ID = " << ID << ", LEN = " << Content_LEN;
-    #endif
+//    #ifdef QT_DEBUG
+//        qDebug() << "NETPACKET: ID = " << ID << ", LEN = " << Content_LEN;
+//    #endif
 
         if ( Content_LEN < 0 ) { // IT IS AN ERROR!!!
             packetError = PACKET_ERROR_BAD_NUMERIC;
@@ -221,9 +221,9 @@ NetPacket& NetPacket::Receive(QTcpSocket *socket, int timeout)
 
     Content = Packet.right(Content_LEN).data();
 
-#ifdef QT_DEBUG
-        qDebug() << "NETPACKET: content = [" << Packet << "]";
-#endif
+//#ifdef QT_DEBUG
+//        qDebug() << "NETPACKET: content = [" << Packet << "]";
+//#endif
 
     ValidPacket = true;
     packetError = PACKET_ERROR_OK;

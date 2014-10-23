@@ -55,20 +55,23 @@ bool NetPacketHandler::SendPacket(NetPacket *packet, int timeout)
         return false;
     }
 
-    qint64 n = current_socket->write(packet->GetByteView());
+    return packet->Send(current_socket, timeout);
+}
 
-    if ( n == -1 ) {
-        lastError = NetPacketHandler::PACKET_ERROR_NETWORK;
-        return false;
+
+bool NetPacketHandler::SendPacket(QList<QTcpSocket *> *queue, NetPacket *packet, int timeout)
+{
+    if ( queue == nullptr ) return true;
+    if ( queue->isEmpty() ) return true;
+
+    foreach (QTcpSocket* socket, *queue) {
+        bool ok = packet->Send(socket,timeout);
+        if ( !ok ) return ok;
     }
 
-    bool ok = current_socket->waitForBytesWritten(timeout);
-    if ( !ok ) {
-        lastError = NetPacketHandler::PACKET_ERROR_NETWORK;
-    } else lastError = NetPacketHandler::PACKET_ERROR_OK;
-
-    return ok;
+    return true;
 }
+
 
 NetPacketHandler::NetPacketHandlerError NetPacketHandler::GetLastError() const
 {

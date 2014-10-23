@@ -9,6 +9,12 @@
                         *                               *
                         ********************************/
 
+#define DOUBLE_TO_INT(double_vec, int_vec) {\
+    foreach (double val, double_vec) {\
+        int_vec << static_cast<int>(val); \
+    }\
+}
+
 
 static QList<QHostAddress> default_hosts_list = QList<QHostAddress>() << QHostAddress(SERVER_DEFAULT_ALLOWED_HOST);
 
@@ -68,28 +74,32 @@ void Server::SetNetworkTimeout(const int timeout)
 
                     /*  Private slots  */
 
+// macro for sending server status
+#define SEND_STATUS(sk) { \
+    ok = server_status_packet.Send(sk,NetworkTimeout); \
+    if ( !ok ) { \
+        lastServerError = sk->error(); \
+        emit ServerError(lastServerError); \
+        sk->disconnectFromHost(); \
+        return; \
+    } \
+}
 void Server::ClientConnection()
 {
     bool ok;
+    StatusNetPacket server_status_packet;
 
     QTcpSocket *socket = nextPendingConnection();
 
     if ( clientSocket != nullptr ) { // client already connected
-        StatusNetPacket packet(SERVER_ERROR_BUSY,"Server is busy");
+        server_status_packet.SetStatus(SERVER_ERROR_BUSY,"Server is busy");
 
 #ifdef QT_DEBUG
         qDebug() << "SERVER MSG: Other client is already connected!";
-        qDebug() << "SERVER SENT: " << packet.GetByteView();
+        qDebug() << "SERVER SENT: " << server_status_packet.GetByteView();
 #endif
 
-        ok = packet.Send(socket,NetworkTimeout);
-        if ( !ok ) {
-            lastServerError = socket->error();
-            emit ServerError(lastServerError);
-        }
-
-        socket->disconnectFromHost();
-        return;
+        SEND_STATUS(socket);
     }
 
     QHostAddress client_address = socket->peerAddress();
@@ -99,21 +109,15 @@ void Server::ClientConnection()
 #endif
 
     if ( !allowed_hosts.contains(client_address) ) { // check for client is in allowed host list
-        StatusNetPacket packet(SERVER_ERROR_DENIED,"Server refused the connection");
+        server_status_packet.SetStatus(SERVER_ERROR_DENIED,"Server refused the connection");
 #ifdef QT_DEBUG
         qDebug() << "SERVER MSG: client address is not allowed!";
-        qDebug() << "SERVER SENT: " << packet.GetByteView();
+        qDebug() << "SERVER SENT: " << server_status_packet.GetByteView();
 #endif
 
-        ok = packet.Send(socket,NetworkTimeout);
-        if ( !ok ) {
-            lastServerError = socket->error();
-            emit ServerError(lastServerError);
-        }
-
-        socket->disconnectFromHost();
-        return;
+        SEND_STATUS(socket);
     }
+
 #ifdef QT_DEBUG
     qDebug() << "SERVER: client IP is valid!";
 #endif
@@ -127,9 +131,10 @@ void Server::ClientConnection()
     if ( !ok ) {
         lastServerError = socket->error();
         emit ServerError(lastServerError);
+        socket->disconnectFromHost();
         return;
     }
-    std::cerr << "hello sending status: " << ok << std::endl;
+
 #ifdef QT_DEBUG
     qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
 #endif
@@ -140,6 +145,7 @@ void Server::ClientConnection()
     if ( !hello.isPacketValid() ) {
         lastServerError = socket->error();
         emit ServerError(lastServerError);
+        socket->disconnectFromHost();
         return;
     }
 #ifdef QT_DEBUG
@@ -149,19 +155,13 @@ void Server::ClientConnection()
     QString senderVersion;
     QString senderType = hello.GetSenderType(&senderVersion);
     QString hello_msg;
-    StatusNetPacket server_ok(SERVER_ERROR_OK,"OK");
+    server_status_packet.SetStatus(SERVER_ERROR_OK,"OK");
 
     if ( senderType == NETPROTOCOL_SENDER_TYPE_CLIENT ) {
         hello_msg = "New NEWTON CLIENT connection from " + client_address.toString();
         emit HelloIsReceived(hello_msg);
 
-        ok = server_ok.Send(socket,NetworkTimeout);
-        if ( !ok ) {
-            socket->disconnectFromHost();
-            lastServerError = socket->error();
-            emit ServerError(lastServerError);
-            return;
-        }
+        SEND_STATUS(socket);
 
         clientSocket = socket;
 
@@ -176,7 +176,7 @@ void Server::ClientConnection()
         hello_msg = "New NEWTON SERVER GUI connection from " + client_address.toString();
         emit HelloIsReceived(hello_msg);
 
-    } else { // unknown command, just reject
+    } else { // unknown, just reject
         socket->disconnectFromHost();
         return;
     }
@@ -207,7 +207,7 @@ void Server::ExecuteCommand()
         return;
     }
 
-    StatusNetPacket status;
+    StatusNetPacket server_status_packet;
     bool ok;
 
     switch ( clientPacket->GetPacketID() ) {
@@ -218,11 +218,11 @@ void Server::ExecuteCommand()
         qDebug() << "SERVER: INFO-packet has been recieved [" << pk->GetInfo() << "]";
 #endif
 
-        status.SetStatus(Server::SERVER_ERROR_OK,"OK");
-        ok = status.Send(clientSocket,NetworkTimeout);
+        server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
+        SEND_STATUS(clientSocket);
 
 #ifdef QT_DEBUG
-        qDebug() << "SERVER: send status [" << status.GetByteView() << "] status = " << ok;
+        qDebug() << "SERVER: send status [" << server_status_packet.GetByteView() << "] status = " << ok;
 #endif
         break;
     }
@@ -230,7 +230,7 @@ void Server::ExecuteCommand()
         CmdNetPacket *pk = static_cast<CmdNetPacket*>(clientPacket);
 
 #ifdef QT_DEBUG
-        qDebug() << "SERVER: CMD-packet has been recieved [" << pk->GetCmdName();
+        qDebug() << "SERVER: CMD-packet has been recieved [" << pk->GetCmdName() << "]";
 #endif
 
         QString command_name = pk->GetCmdName();
@@ -241,23 +241,55 @@ void Server::ExecuteCommand()
 
         } else if ( command_name == NETPROTOCOL_COMMAND_BINNING ) {
             QVector<double> bin_vals;
+            QVector<int> bin_vals_int;
             ok = pk->GetCmdArgs(&bin_vals);
             if ( !ok ) {
-                status.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+                SEND_STATUS(clientSocket);
             }
 #ifdef QT_DEBUG
-            qDebug() << "SERVER: COMMAND: [" << NETPROTOCOL_COMMAND_BINNING << "] ARGS: [" << bin_vals << "]";
+            DOUBLE_TO_INT(bin_vals,bin_vals_int);
+            qDebug() << "SERVER: ARGS: " << bin_vals_int;
 #endif
+        } else if ( command_name == NETPROTOCOL_COMMAND_ROI ) {
+            QVector<double> roi_vals;
+            QVector<int> roi_vals_int;
+
+            ok = pk->GetCmdArgs(&roi_vals);
+            if ( !ok ) {
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+                SEND_STATUS(clientSocket);
+            }
+#ifdef QT_DEBUG
+            DOUBLE_TO_INT(roi_vals,roi_vals_int);
+            qDebug() << "SERVER: ARGS: " << roi_vals_int;
+#endif
+        } else if ( command_name == NETPROTOCOL_COMMAND_GAIN ) {
+
+        } else if ( command_name == NETPROTOCOL_COMMAND_RATE ) {
+
+        } else if ( command_name == NETPROTOCOL_COMMAND_SHUTTER ) {
+
+        } else if ( command_name == NETPROTOCOL_COMMAND_SETTEMP ) {
+
+        } else if ( command_name == NETPROTOCOL_COMMAND_GETTEMP ) {
+
+        } else if ( command_name == NETPROTOCOL_COMMAND_FITSFILE ) {
+
+        } else if ( command_name == NETPROTOCOL_COMMAND_HEADFILE ) {
+
         } else {
-            status.SetStatus(Server::SERVER_ERROR_UNKNOWN_COMMAND,"");
+            server_status_packet.SetStatus(Server::SERVER_ERROR_UNKNOWN_COMMAND,"");
+            SEND_STATUS(clientSocket);
         }
 
-        status.SetStatus(Server::SERVER_ERROR_OK,"OK");
-        ok = status.Send(clientSocket,NetworkTimeout);
+        server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
+        SEND_STATUS(clientSocket);
 
 #ifdef QT_DEBUG
-        qDebug() << "SERVER: send status [" << status.GetByteView() << "] status = " << ok;
+        qDebug() << "SERVER: send status [" << server_status_packet.GetByteView() << "] status = " << ok;
 #endif
+
         break;
     }
     case NetPacket::PACKET_ID_STATUS: {
@@ -277,11 +309,11 @@ void Server::ExecuteCommand()
 #ifdef QT_DEBUG
         qDebug() << "SERVER: HELLO-packet has been recieved [" << clientPacket->GetPacketContent() << "]";
 #endif
-        status.SetStatus(Server::SERVER_ERROR_OK,"OK");
-        ok = status.Send(clientSocket,NetworkTimeout);
+        server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
+        SEND_STATUS(clientSocket);
 
 #ifdef QT_DEBUG
-        qDebug() << "SERVER: send status [" << status.GetByteView() << "] status = " << ok;
+        qDebug() << "SERVER: send status [" << server_status_packet.GetByteView() << "] status = " << ok;
 #endif
         break;
     }

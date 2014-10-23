@@ -39,6 +39,7 @@
 #define NETPROTOCOL_COMMAND_EXPTIME  "EXPTIME"  // exposure time
 #define NETPROTOCOL_COMMAND_RATE     "RATE"     // set read-out rate
 #define NETPROTOCOL_COMMAND_ROI      "ROI"      // set read-out region
+#define NETPROTOCOL_COMMAND_SHUTTER  "SHUTTER"  // set shutter state
 #define NETPROTOCOL_COMMAND_SETTEMP  "SETTEMP"  // set CCD chip temperature
 #define NETPROTOCOL_COMMAND_GETTEMP  "GETTEMP"  // get CCD chip temperature
 #define NETPROTOCOL_COMMAND_FITSFILE "FITSFILE" // name of output FITS file

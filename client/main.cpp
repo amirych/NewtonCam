@@ -21,8 +21,17 @@
 // client errors
 
 enum ClientError {CLIENT_ERROR_OK, CLIENT_ERROR_INVALID_OPTION = 10, CLIENT_ERROR_CONNECTION,
-                  CLIENT_ERROR_UNKNOWN_SERVER, CLIENT_ERROR_INVALID_SERVER_STATUS};
+                  CLIENT_ERROR_UNKNOWN_SERVER, CLIENT_ERROR_INVALID_SERVER_STATUS, CLIENT_ERROR_INVALID_TEMP_RESPONSE};
 
+// send command macro
+
+#define SEND_COMMAND {\
+    ok = command_packet.Send(&socket,NETPROTOCOL_TIMEOUT); \
+    if ( !ok ) { \
+        socket.disconnectFromHost(); \
+        return CLIENT_ERROR_CONNECTION; \
+    } \
+}
 
 // get server status macro
 
@@ -66,6 +75,8 @@ int main(int argc, char *argv[])
 
     QCommandLineOption rateOption(QStringList() << "r" << "rate", "Set readout rate", "rate string");
 
+    QCommandLineOption shutterOption(QStringList() << "s" << "shutter", "Shutter control", "boolean value", "1");
+
     QCommandLineOption tempOption("settemp", "Set CCD chip temperature", "degrees");
 
     QCommandLineOption gettempOption("gettemp", "Get CCD chip temperature");
@@ -87,6 +98,7 @@ int main(int argc, char *argv[])
     cmdline_parser.addOption(gainOption);
     cmdline_parser.addOption(roiOption);
     cmdline_parser.addOption(rateOption);
+    cmdline_parser.addOption(shutterOption);
     cmdline_parser.addOption(tempOption);
     cmdline_parser.addOption(gettempOption);
 
@@ -146,6 +158,16 @@ int main(int argc, char *argv[])
         }
     }
 
+
+    // shutter state
+    QString shutter_str = cmdline_parser.value(shutterOption);
+    int shutter_state = shutter_str.toInt(&ok); // shutterOtion has default value, so do not check for empty string
+    if ( !ok ) {
+        qDebug() << "BAD SHUTTER STATE!";
+        return CLIENT_ERROR_INVALID_OPTION;
+    }
+
+
     // CCD temperature
     QString temp_str = cmdline_parser.value(tempOption);
     double ccd_temp;
@@ -178,6 +200,8 @@ int main(int argc, char *argv[])
                   << ":" << server_port << std::endl;
         return CLIENT_ERROR_CONNECTION;
     }
+
+    QObject::connect(&socket,&QTcpSocket::disconnected,[=](){exit(CLIENT_ERROR_CONNECTION);});
 
 
     HelloNetPacket hello;
@@ -217,29 +241,122 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.isSet(stopOption) ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_STOP,"");
-        command_packet.Send(&socket,NETPROTOCOL_TIMEOUT);
+        SEND_COMMAND;
         SERVER_STATUS;
     }
 
 
     // --init
     if ( cmdline_parser.isSet(initOption) ) {
-
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_INIT,"");
+        SEND_COMMAND;
+        SERVER_STATUS;
     }
+
+    // --gettemp, it is a special command! The program receives a CCD temperature and exit!
+
+    if ( cmdline_parser.isSet(gettempOption)) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_GETTEMP,"");
+        SEND_COMMAND;
+        TempNetPacket pk;
+        pk.Receive(&socket,NETPROTOCOL_TIMEOUT);
+        if ( !pk.isPacketValid() ) {
+            socket.disconnectFromHost();
+            return CLIENT_ERROR_INVALID_TEMP_RESPONSE;
+        }
+        SERVER_STATUS;
+
+        unsigned int cooling_status;
+        ccd_temp = pk.GetTemp(&cooling_status);
+        std::cout << ccd_temp << " " << cooling_status;
+
+        socket.disconnectFromHost();
+        return status;
+    }
+
 
 
     // --bin (-b)
 
     if ( cmdline_parser.value(binOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_BINNING,bin_vals);
-        ok = command_packet.Send(&socket,NETPROTOCOL_TIMEOUT);
+        SEND_COMMAND;
         SERVER_STATUS;
 #ifdef QT_DEBUG
         qDebug() << "CLIENT: server answer: " << status;
 #endif
     }
 
-    //
+    // --rate (-r)
+
+    if ( cmdline_parser.value(rateOption) != "" ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_RATE,cmdline_parser.value(rateOption));
+        SEND_COMMAND;
+        SERVER_STATUS;
+    }
+
+
+    // --gain (-g)
+
+    if ( cmdline_parser.value(gainOption) != "" ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_GAIN,cmdline_parser.value(gainOption));
+        SEND_COMMAND;
+        SERVER_STATUS;
+    }
+
+
+    // --frame (-f)
+
+    if ( cmdline_parser.value(roiOption) != "" ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_ROI,roi_vals);
+        SEND_COMMAND;
+        SERVER_STATUS;
+    }
+
+
+    // --exp (-e)
+
+    if ( cmdline_parser.value(expOption) != "" ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_EXPTIME,exp_time);
+        SEND_COMMAND;
+        SERVER_STATUS;
+    }
+
+
+    // --shutter (-s)
+
+    command_packet.SetCommand(NETPROTOCOL_COMMAND_SHUTTER, shutter_state == 0 ? 0.0 : 1.0);
+    SEND_COMMAND;
+    SERVER_STATUS;
+
+
+    // --settemp
+
+    if ( cmdline_parser.value(tempOption) != "" ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_SETTEMP,ccd_temp);
+        SEND_COMMAND;
+        SERVER_STATUS;
+    }
+
+
+    // positional arguments (FITS and optional header files) if present
+
+    QStringList pos_args = cmdline_parser.positionalArguments();
+
+    if ( !pos_args.isEmpty() ) {
+        // result FITS-file name
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_FITSFILE,pos_args[0]);
+        SEND_COMMAND;
+        SERVER_STATUS;
+
+        // user FITS-header file
+        if ( pos_args.length() > 1 ) {
+            command_packet.SetCommand(NETPROTOCOL_COMMAND_HEADFILE,pos_args[1]);
+            SEND_COMMAND;
+            SERVER_STATUS;
+        }
+    }
+
 #ifdef QT_DEBUG
     qDebug() << "Disconnect from server";
 #endif
