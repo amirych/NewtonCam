@@ -7,4 +7,5 @@ SUBDIRS += \
     test \
     cam_caps \
     client \
-    test_server
+    test_server \
+    serverGUI

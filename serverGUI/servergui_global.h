@@ -1,0 +1,12 @@
+#ifndef SERVERGUI_GLOBAL_H
+#define SERVERGUI_GLOBAL_H
+
+#include <QtCore/qglobal.h>
+
+#if defined(SERVERGUI_LIBRARY)
+#  define SERVERGUISHARED_EXPORT Q_DECL_EXPORT
+#else
+#  define SERVERGUISHARED_EXPORT Q_DECL_IMPORT
+#endif
+
+#endif // SERVERGUI_GLOBAL_H
