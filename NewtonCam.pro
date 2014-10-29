@@ -4,8 +4,9 @@ SUBDIRS += \
     net_protocol \
     camera \
     server \
-    test \
     cam_caps \
     client \
+    serverGUI \
+    test \
     test_server \
-    serverGUI
+    NewtonGUI

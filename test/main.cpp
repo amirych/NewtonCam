@@ -60,5 +60,7 @@ int main(int argc, char *argv[])
     cout << "Camera last error: " << cc.GetLastError() << endl;
 
 //    return a.exec();
+
+
     return 0;
 }

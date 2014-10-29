@@ -47,7 +47,10 @@ public slots:
 private:
     QTcpSocket *current_socket;
 
-    QList<NetPacket*> packet_queue;
+//    QList<NetPacket*> packet_queue;
+
+//    QList<NetPacket*> send_queue;
+    QList<NetPacket*> receive_queue;
 
     NetPacketHandlerError lastError;
 

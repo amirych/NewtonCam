@@ -4,7 +4,7 @@
                 /*  Constructors and destructor  */
 
 NetPacketHandler::NetPacketHandler(QTcpSocket *socket, QObject *parent):
-    QObject(parent), current_socket(socket), packet_queue(QList<NetPacket*>()),
+    QObject(parent), current_socket(socket), receive_queue(QList<NetPacket*>()),
     newPacket(true), lastError(PACKET_ERROR_OK)
 {
     packet = new NetPacket();
@@ -19,8 +19,8 @@ NetPacketHandler::~NetPacketHandler()
 {
     delete packet;
 
-    if ( !packet_queue.empty() ) {
-        foreach (NetPacket *pk, packet_queue) {
+    if ( !receive_queue.empty() ) {
+        foreach (NetPacket *pk, receive_queue) {
            delete pk;
         }
     }
@@ -38,13 +38,13 @@ void NetPacketHandler::SetSocket(QTcpSocket *socket)
 
 NetPacket* NetPacketHandler::GetPacket()
 {
-    if ( packet_queue.isEmpty() ) {
+    if ( receive_queue.isEmpty() ) {
         lastError = NetPacketHandler::PACKET_ERROR_EMPTY_QUEUE;
         return nullptr;
     }
 
     lastError = NetPacketHandler::PACKET_ERROR_OK;
-    return packet_queue.takeFirst();
+    return receive_queue.takeFirst();
 }
 
 
@@ -97,33 +97,33 @@ void NetPacketHandler::ReadDataStream()
     if ( packet->GetPacketError() == NetPacket::PACKET_ERROR_WAIT ) return; // wait for new data
 
     if ( packet->GetPacketError() != NetPacket::PACKET_ERROR_OK ) {
-        packet_queue << packet;
+        receive_queue << packet;
         return;
     }
 
     switch (packet->GetPacketID()) {
     case NetPacket::PACKET_ID_INFO: {
-        packet_queue << packet;
+        receive_queue << packet;
         break;
     }
     case NetPacket::PACKET_ID_CMD: {
         CmdNetPacket *pk = new CmdNetPacket(*packet);
-        packet_queue << pk;
+        receive_queue << pk;
         break;
     }
     case NetPacket::PACKET_ID_STATUS: {
         StatusNetPacket *pk = new StatusNetPacket(*packet);
-        packet_queue << pk;
+        receive_queue << pk;
         break;
     }
     case NetPacket::PACKET_ID_TEMP: {
         TempNetPacket *pk = new TempNetPacket(*packet);
-        packet_queue << pk;
+        receive_queue << pk;
         break;
     }
     case NetPacket::PACKET_ID_HELLO: {
         HelloNetPacket *pk = new HelloNetPacket(*packet);
-        packet_queue << pk;
+        receive_queue << pk;
         break;
     }
     default:
@@ -196,7 +196,7 @@ void NetPacketHandler::ReadDataStream()
 //    switch (ID) {
 //    case NetPacket::PACKET_ID_INFO: {
 //        InfoNetPacket *pk = new InfoNetPacket(Content);
-//        packet_queue << pk;
+//        receive_queue << pk;
 //        break;
 //    }
 //    case NetPacket::PACKET_ID_CMD: {
@@ -205,7 +205,7 @@ void NetPacketHandler::ReadDataStream()
 //        SplitContent(cmd,args);
 
 //        CmdNetPacket *pk = new CmdNetPacket(cmd,args);
-//        packet_queue << pk;
+//        receive_queue << pk;
 //        break;
 //    }
 //    case NetPacket::PACKET_ID_STATUS: {
@@ -223,12 +223,12 @@ void NetPacketHandler::ReadDataStream()
 //        }
 
 //        StatusNetPacket *pk =  new StatusNetPacket(err_no,err_str);
-//        packet_queue << pk;
+//        receive_queue << pk;
 //        break;
 //    }
 //    case NetPacket::PACKET_ID_HELLO: {
 //        NetPacket *pk = new NetPacket(NetPacket::PACKET_ID_HELLO,Content);
-//        packet_queue << pk;
+//        receive_queue << pk;
 //        break;
 //    }
 //    default:

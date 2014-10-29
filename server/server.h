@@ -54,6 +54,7 @@ private slots:
     void ClientConnection();
     void ClientDisconnected();
     void ExecuteCommand();
+    void GUIDisconnected();
 
 
 private:

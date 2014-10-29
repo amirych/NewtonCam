@@ -173,6 +173,7 @@ void Server::ClientConnection()
 
     } else if ( senderType == NETPROTOCOL_SENDER_TYPE_GUI ) {
         guiSocket << socket;
+        connect(socket,SIGNAL(disconnected()),this,SLOT(GUIDisconnected()));
         hello_msg = "New NEWTON SERVER GUI connection from " + client_address.toString();
         emit HelloIsReceived(hello_msg);
 
@@ -220,6 +221,8 @@ void Server::ExecuteCommand()
 
         server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
         SEND_STATUS(clientSocket);
+
+        packetHandler->SendPacket(&guiSocket,pk);
 
 #ifdef QT_DEBUG
         qDebug() << "SERVER: send status [" << server_status_packet.GetByteView() << "] status = " << ok;
@@ -321,6 +324,21 @@ void Server::ExecuteCommand()
     }
 }
 
+
+void Server::GUIDisconnected() // remove socket of disconnected server GUI
+{
+    QObject* sender = QObject::sender();
+
+    if ( sender != nullptr ) {
+        int i = 0;
+        foreach (QTcpSocket* sk, guiSocket) {
+            if ( sk == sender ) {
+                guiSocket.removeAt(i);
+            }
+            ++i;
+        }
+    }
+}
 
                 /*  Private members  */
 

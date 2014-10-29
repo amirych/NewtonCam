@@ -11,6 +11,9 @@ TEMPLATE = lib
 
 DEFINES += SERVERGUI_LIBRARY
 
+QMAKE_CXXFLAGS += -std=c++11
+
+
 SOURCES += servergui.cpp
 
 HEADERS += servergui.h\

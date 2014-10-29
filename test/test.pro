@@ -47,3 +47,4 @@ unix:!macx: LIBS += -L$$PWD/../AndorSDK/ -landor
 
 INCLUDEPATH += $$PWD/../AndorSDK
 DEPENDPATH += $$PWD/../AndorSDK
+

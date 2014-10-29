@@ -361,6 +361,10 @@ int main(int argc, char *argv[])
     qDebug() << "Disconnect from server";
 #endif
 
+    InfoNetPacket ii("command-line from client");
+    ii.Send(&socket);
+    server_status_packet.Receive(&socket);
+
     socket.disconnectFromHost();
 
     return CLIENT_ERROR_OK;
