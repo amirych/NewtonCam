@@ -78,6 +78,7 @@ void Server::SetNetworkTimeout(const int timeout)
 #define SEND_STATUS(sk) { \
     ok = server_status_packet.Send(sk,NetworkTimeout); \
     if ( !ok ) { \
+        qDebug() << "ERROR OF SERVER STATUS SENDING! " << "Packet error: " << server_status_packet.GetPacketError(); \
         lastServerError = sk->error(); \
         emit ServerError(lastServerError); \
         sk->disconnectFromHost(); \
@@ -272,6 +273,18 @@ void Server::ExecuteCommand()
         } else if ( command_name == NETPROTOCOL_COMMAND_RATE ) {
 
         } else if ( command_name == NETPROTOCOL_COMMAND_SHUTTER ) {
+            double flag;
+
+            ok = pk->GetCmdArgs(&flag);
+#ifdef QT_DEBUG
+            qDebug() << "shutter state: " << flag;
+#endif
+            if ( !ok ) {
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+                SEND_STATUS(clientSocket);
+            }
+
+        } else if ( command_name == NETPROTOCOL_COMMAND_EXPTIME ) {
 
         } else if ( command_name == NETPROTOCOL_COMMAND_SETTEMP ) {
 
@@ -282,16 +295,21 @@ void Server::ExecuteCommand()
         } else if ( command_name == NETPROTOCOL_COMMAND_HEADFILE ) {
 
         } else {
-            server_status_packet.SetStatus(Server::SERVER_ERROR_UNKNOWN_COMMAND,"");
+            server_status_packet.SetStatus(Server::SERVER_ERROR_UNKNOWN_COMMAND,"UNKNOWN COMMAND");
+            qDebug() << "[[[" << server_status_packet.GetByteView() << "]]]";
             SEND_STATUS(clientSocket);
+            return;
         }
 
         server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
-        SEND_STATUS(clientSocket);
-
 #ifdef QT_DEBUG
-        qDebug() << "SERVER: send status [" << server_status_packet.GetByteView() << "] status = " << ok;
+        qDebug() << "SERVER: sending status [" << server_status_packet.GetByteView();
 #endif
+        SEND_STATUS(clientSocket);
+#ifdef QT_DEBUG
+        qDebug() << "net. status = " << ok;
+#endif
+
 
         break;
     }
@@ -334,6 +352,7 @@ void Server::GUIDisconnected() // remove socket of disconnected server GUI
         foreach (QTcpSocket* sk, guiSocket) {
             if ( sk == sender ) {
                 guiSocket.removeAt(i);
+                return;
             }
             ++i;
         }

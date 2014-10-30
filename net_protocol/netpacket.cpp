@@ -73,7 +73,8 @@ void NetPacket::MakePacket()
 
     pk << qSetFieldWidth(NETPROTOCOL_ID_FIELD_LEN) << right << ID
        << qSetFieldWidth(NETPROTOCOL_SIZE_FIELD_LEN) << right
-          << Content.length() << Content;
+       << Content.length() << qSetFieldWidth(Content.length())
+       <<  left << Content;
 
     Content_LEN = Content.length();
 
@@ -119,6 +120,7 @@ void NetPacket::SetContent(const NetPacketID id, const char *content)
 {
     ID = id;
     Content = content;
+    Content.trimmed();
     MakePacket();
 }
 
@@ -127,6 +129,7 @@ void NetPacket::SetContent(const NetPacketID id, const QString &content)
 {
     ID = id;
     Content = content;
+    Content.trimmed();
     MakePacket();
 }
 
@@ -145,6 +148,7 @@ bool NetPacket::Send(QTcpSocket *socket, int timeout) // WARNING: THIS CALL BLOC
         return false;
     }
 
+//    return true;
     return socket->waitForBytesWritten(timeout);
 }
 
@@ -160,6 +164,7 @@ NetPacket& NetPacket::Receive(QTcpSocket *socket, int timeout)
         return *this;
     }
 
+
     bool ok;
 
     if ( ValidPacket ) {
@@ -170,6 +175,8 @@ NetPacket& NetPacket::Receive(QTcpSocket *socket, int timeout)
             }
         }
         ValidPacket = false;
+
+//        qDebug() << "   START RECEIVING  ... OLD CONTENT: " << Packet;
 
         Packet = socket->read(NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN);
         if ( Packet.size() < (NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN) ) { // IT IS AN ERROR!!!
@@ -192,6 +199,7 @@ NetPacket& NetPacket::Receive(QTcpSocket *socket, int timeout)
         Content_LEN = Packet.right(NETPROTOCOL_SIZE_FIELD_LEN).toLong(&ok);
         if (!ok) { // IT IS AN ERROR!!!
             packetError = PACKET_ERROR_UNKNOWN_PROTOCOL;
+            qDebug() << "CONTENT: " << socket->readAll();
             return *this;
         }
 
@@ -618,7 +626,13 @@ void StatusNetPacket::Init()
 
     QTextStream content(&str);
 
-    content << Err_Code << NETPROTOCOL_CONTENT_DELIMETER << Err_string;
+    if ( Err_string.isEmpty() || Err_string.isNull() ) {
+        content << left << Err_Code;
+    } else {
+        content << left << Err_Code << NETPROTOCOL_CONTENT_DELIMETER << Err_string;
+    }
+
+    content.flush();
 
     SetContent(NetPacket::PACKET_ID_STATUS,str);
 }
@@ -661,6 +675,7 @@ void StatusNetPacket::ParseContent()
     if ( !ok ) {
         ValidPacket = false;
         packetError = PACKET_ERROR_BAD_NUMERIC;
+        return;
     }
 
     ValidPacket = true;

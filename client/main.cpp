@@ -7,7 +7,6 @@
 #include <QString>
 #include <QStringList>
 #include <QVector>
-#include <QTimer>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QRegExp>
@@ -38,10 +37,13 @@ enum ClientError {CLIENT_ERROR_OK, CLIENT_ERROR_INVALID_OPTION = 10, CLIENT_ERRO
 #define SERVER_STATUS {\
     server_status_packet.Receive(&socket,NETPROTOCOL_TIMEOUT); \
     if ( !server_status_packet.isPacketValid() ) { \
+        qDebug() << "PACKET ERROR: " << server_status_packet.GetPacketError();\
         qDebug() << "BAD SERVER STATUS PACKET!"; \
         return CLIENT_ERROR_CONNECTION; \
     } \
-    if ( (status = server_status_packet.GetStatus()) != Server::SERVER_ERROR_OK ) {\
+    status = server_status_packet.GetStatus(); \
+    qDebug() << "<> SERVER RESPONDS: " << status; \
+    if ( status != Server::SERVER_ERROR_OK ) {\
         return status; \
     } \
 }
@@ -282,9 +284,6 @@ int main(int argc, char *argv[])
         command_packet.SetCommand(NETPROTOCOL_COMMAND_BINNING,bin_vals);
         SEND_COMMAND;
         SERVER_STATUS;
-#ifdef QT_DEBUG
-        qDebug() << "CLIENT: server answer: " << status;
-#endif
     }
 
     // --rate (-r)
@@ -361,71 +360,14 @@ int main(int argc, char *argv[])
     qDebug() << "Disconnect from server";
 #endif
 
+
     InfoNetPacket ii("command-line from client");
     ii.Send(&socket);
     server_status_packet.Receive(&socket);
 
+    socket.disconnect(); // disconnect all slots
+
     socket.disconnectFromHost();
 
     return CLIENT_ERROR_OK;
-
-    CmdNetPacket pk("EXP",2.57);
-    InfoNetPacket ipk("This is the test client!!!");
-
-    QString addr = "127.0.0.1";
-    QTcpSocket s;
-
-    QObject::connect(&s,SIGNAL(disconnected()),&a,SLOT(quit()));
-
-    s.connectToHost(server_ip,server_port);
-    if ( !s.waitForConnected() ) {
-        std::cerr << "Cannot connect to server!\n";
-        exit(10);
-    }
-
-    StatusNetPacket st;
-    NetPacket pp;
-    for ( long i = 0; i < 10; ++i ) {
-        std::cerr << "------------(" << i << ")-----------------\n";
-        ok = pk.Send(&s);
-        if ( !ok ) {
-            std::cerr << "Cannot send CMD-packet!\n";
-            break;
-        } else std::cerr << "Sent CMD-packet\n";
-//        st.Receive(&s,10000);
-//        while (st.GetPacketError() == NetPacket::PACKET_ERROR_WAIT ) {
-//            if ( !s.waitForReadyRead(10000) ) break;
-//            st.Receive(&s,0);
-//        }
-        pp.Receive(&s,10000);
-        st = pp;
-        if ( !st.isPacketValid() ) {
-            std::cerr << "Bad server response!\n";
-            break;
-        } else {
-            std::cerr << "CLIENT: server response: [" << st.GetByteView().data() <<
-                         "] (generic: " << pp.GetByteView().data() << ")\n";
-        }
-        ok = ipk.Send(&s);
-        if ( !ok ) {
-            std::cerr << "Cannot send INFO-packet!\n";
-            break;
-        } else std::cerr << "Sent INFO-packet\n";
-    }
-
-//    QTimer::singleShot(3000,&s,SLOT(disconnectFromHostImplementation()));
-//    QTimer::singleShot(3000,&s,"");
-
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-
-    s.disconnectFromHost();
-
-//    QTimer::singleShot(3000,&s,SLOT(disconnectFromHostImplementation())); // No such slot in QT 5.3!!!
-
-//    QTimer::singleShot(3000,&a,SLOT(quit()));
-
-    //    s.disconnectFromHost();
-
-//    return 0;
-    return a.exec();
 }

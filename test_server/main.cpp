@@ -8,6 +8,6 @@ int main(int argc, char *argv[])
 
     Server s;
 
-    QTimer::singleShot(20000,&a,SLOT(quit()));
+    QTimer::singleShot(30000,&a,SLOT(quit()));
     return a.exec();
 }
