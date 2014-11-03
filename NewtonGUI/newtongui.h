@@ -7,17 +7,27 @@
 #include "servergui.h"
 
 #include <QObject>
+#include <QWidget>
 #include <QTcpSocket>
 #include <QHostAddress>
 #include <QMessageBox>
 
 
-class NewtonGui: QObject
+#define NEWTONGUI_ERROR_INVALID_PORT 10
+#define NEWTONGUI_ERROR_CANNOT_CONNECT 11
+#define NEWTONGUI_ERROR_NETWORK 12
+#define NEWTONGUI_ERROR_INVALID_SERVER 13
+#define NEWTONGUI_ERROR_INVALID_FONTSIZE 14
+
+
+class NewtonGui: public QWidget
 {
     Q_OBJECT
 
 public:
-    NewtonGui(QObject* parent, QHostAddress &server_addr, quint16 port = NETPROTOCOL_DEFAULT_PORT);
+    NewtonGui(int fontsize = SERVERGUI_DEFAULT_FONTSIZE);
+
+    void Connect(QHostAddress &server_addr, quint16 port = NETPROTOCOL_DEFAULT_PORT);
 
     ~NewtonGui();
 

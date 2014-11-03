@@ -1,5 +1,7 @@
 #include "servergui.h"
 
+#include <QDebug>
+
 
 ServerGUI::ServerGUI(int fontsize, QWidget *parent): QMainWindow(parent),
     fontSize(fontsize)
@@ -18,6 +20,20 @@ ServerGUI::ServerGUI(int fontsize, QWidget *parent): QMainWindow(parent),
     cWidget->setFrameShape(QFrame::Box);
     cWidget->setFrameShadow(QFrame::Raised);
     cWidget->setFont(font);
+
+    temperature_label = new QLabel("<b>  CCD Temp: </b> No connection  ",cWidget);
+    statusBar()->addWidget(temperature_label);
+
+    cooler_label = new QLabel("<b>  Cooler status: </b> No connection  ",cWidget);
+    statusBar()->addWidget(cooler_label);
+
+    camera_err_label = new QLabel("<b>  Err: </b>OK  ",cWidget);
+    statusBar()->addPermanentWidget(camera_err_label);
+
+    network_err_label = new QLabel("<b>  Net: </b> OK  ",cWidget);
+    statusBar()->addPermanentWidget(network_err_label);
+
+    statusBar()->setFont(font);
 
     QVBoxLayout* main_layout = new QVBoxLayout(cWidget);
 
@@ -58,19 +74,6 @@ ServerGUI::ServerGUI(int fontsize, QWidget *parent): QMainWindow(parent),
 
     main_layout->addWidget(log_gb);
 
-    temperature_label = new QLabel("<b>  CCD Temp: </b> No connection  ",cWidget);
-    statusBar()->addWidget(temperature_label);
-
-    cooler_label = new QLabel("<b>  Cooler status: </b> No connection  ",cWidget);
-    statusBar()->addWidget(cooler_label);
-
-    camera_err_label = new QLabel("<b>  Err: </b>OK  ",cWidget);
-    statusBar()->addPermanentWidget(camera_err_label);
-
-    network_err_label = new QLabel("<b>  Net: </b> OK  ",cWidget);
-    statusBar()->addPermanentWidget(network_err_label);
-
-//    statusBar()->setFont(font);
     this->layout()->setSizeConstraint(QLayout::SetFixedSize);
 }
 
@@ -78,6 +81,11 @@ ServerGUI::ServerGUI(QWidget *parent): ServerGUI(SERVERGUI_DEFAULT_FONTSIZE,pare
 {
 }
 
+
+ServerGUI::~ServerGUI()
+{
+    qDebug() << "ServerGUI is destroyed!";
+}
 
 
 void ServerGUI::LogMessage(QString msg)

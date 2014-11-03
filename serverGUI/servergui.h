@@ -24,6 +24,8 @@ public:
     ServerGUI(QWidget *parent = 0);
     ServerGUI(int fontsize, QWidget *parent = 0);
 
+    ~ServerGUI();
+
 public slots:
     void LogMessage(QString msg);
     void TempChanged(double temp);

@@ -3,18 +3,30 @@
 
 #include <QDateTime>
 #include <QString>
+#include <QFont>
 
-
-NewtonGui::NewtonGui(QObject *parent, QHostAddress &server_addr, quint16 port): QObject(parent)
+NewtonGui::NewtonGui(int fontsize): QWidget(), socket(nullptr)
 {
-    serverGUI = new ServerGUI;
+    serverGUI = new ServerGUI(fontsize,this);
     serverGUI->show();
 
     QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
 
     serverGUI->LogMessage("<b> " + str + ":</b> Starting NewtonCam server GUI ...");
+}
 
-    str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
+
+NewtonGui::~NewtonGui()
+{
+    if ( socket != nullptr ) socket->disconnectFromHost();
+
+    qDebug() << "NewtonGUI is destroying!";
+}
+
+
+void NewtonGui::Connect(QHostAddress &server_addr, quint16 port)
+{
+    QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
 
     serverGUI->LogMessage("<b> " + str + ":</b> Trying to connect to NewtonCam server ...");
 
@@ -26,7 +38,7 @@ NewtonGui::NewtonGui(QObject *parent, QHostAddress &server_addr, quint16 port): 
 
     if ( !socket->waitForConnected(NETPROTOCOL_TIMEOUT) ) {
         QMessageBox::StandardButton bt = QMessageBox::critical(serverGUI,"Error","Can not connect to NewtonCam server!");
-        emit Error(1);
+        emit Error(NEWTONGUI_ERROR_CANNOT_CONNECT);
         return;
     }
 
@@ -44,7 +56,7 @@ NewtonGui::NewtonGui(QObject *parent, QHostAddress &server_addr, quint16 port): 
     if ( !hello.isPacketValid() ) {
         socket->disconnectFromHost();
         QMessageBox::StandardButton bt = QMessageBox::critical(serverGUI,"Error","Network error!");
-        emit Error(1);
+        emit Error(NEWTONGUI_ERROR_NETWORK);
         return;
     }
 
@@ -54,7 +66,7 @@ NewtonGui::NewtonGui(QObject *parent, QHostAddress &server_addr, quint16 port): 
     if ( serverType != NETPROTOCOL_SENDER_TYPE_SERVER ) {
         socket->disconnectFromHost();
         QMessageBox::StandardButton bt = QMessageBox::critical(serverGUI,"Error","It seems this is not NewtonCam server!");
-        emit Error(1);
+        emit Error(NEWTONGUI_ERROR_INVALID_SERVER);
         return;
     }
 
@@ -70,7 +82,7 @@ NewtonGui::NewtonGui(QObject *parent, QHostAddress &server_addr, quint16 port): 
     if ( !ok ) {
         socket->disconnectFromHost();
         QMessageBox::StandardButton bt = QMessageBox::critical(serverGUI,"Error","Network error!");
-        emit Error(1);
+        emit Error(NEWTONGUI_ERROR_NETWORK);
         return;
     }
 
@@ -82,15 +94,6 @@ NewtonGui::NewtonGui(QObject *parent, QHostAddress &server_addr, quint16 port): 
 
     connect(socket,SIGNAL(readyRead()),pk_handler,SLOT(ReadDataStream()));
 }
-
-
-NewtonGui::~NewtonGui()
-{
-    socket->disconnectFromHost();
-
-    delete serverGUI;
-}
-
 
 
 
