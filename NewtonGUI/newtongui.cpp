@@ -37,8 +37,15 @@ void NewtonGui::Connect(QHostAddress &server_addr, quint16 port)
     socket->connectToHost(server_addr, port);
 
     if ( !socket->waitForConnected(NETPROTOCOL_TIMEOUT) ) {
+        str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
+        serverGUI->LogMessage("<b> " + str + ":</b> Can not connect to NewtonCam server!");
         QMessageBox::StandardButton bt = QMessageBox::critical(serverGUI,"Error","Can not connect to NewtonCam server!");
         emit Error(NEWTONGUI_ERROR_CANNOT_CONNECT);
+
+        serverGUI->TempChanged(-10.0003);
+
+        serverGUI->CoolerStatusChanged(20034);
+
         return;
     }
 
@@ -113,7 +120,29 @@ void NewtonGui::ServerMsgIsReceived()
 
     pk = pk_handler->GetPacket();
 
-    serverGUI->LogMessage(pk->GetPacketContent());
+
+    switch (pk->GetPacketID()) {
+        case NetPacket::PACKET_ID_STATUS: {
+            StatusNetPacket *st_pk = static_cast<StatusNetPacket*>(pk);
+            unsigned int status = st_pk->GetStatus();
+            serverGUI->ServerError(status);
+            break;
+        }
+        case NetPacket::PACKET_ID_INFO: {
+            serverGUI->LogMessage(pk->GetPacketContent());
+            break;
+        }
+        case NetPacket::PACKET_ID_TEMP: {
+            TempNetPacket *t_pk = static_cast<TempNetPacket*>(pk);
+            unsigned int cstatus;
+            double temp = t_pk->GetTemp(&cstatus);
+            serverGUI->TempChanged(temp);
+            serverGUI->CoolerStatusChanged(cstatus);
+            break;
+        }
+        default: // still just ignoring other types of packet
+            break;
+    }
 
     delete pk;
 }

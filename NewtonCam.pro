@@ -9,4 +9,5 @@ SUBDIRS += \
     serverGUI \
     test \
     test_server \
-    NewtonGUI
+    NewtonGUI \
+    NewtonCam

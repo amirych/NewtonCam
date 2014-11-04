@@ -24,17 +24,21 @@ public:
     ServerGUI(QWidget *parent = 0);
     ServerGUI(int fontsize, QWidget *parent = 0);
 
+    void SetFonts(int fontsize, int status_fontsize, int log_fontsize);
+
     ~ServerGUI();
 
 public slots:
     void LogMessage(QString msg);
     void TempChanged(double temp);
     void CoolerStatusChanged(unsigned int status);
-    void NetworkError();
+    void NetworkError(int err);
     void ServerError(unsigned int err_code);
 
 private:
     int fontSize;
+    int statusFontSize;
+    int logFontSize;
 
     QLCDNumber* exp_progress;
     QLabel* cam_status_label;
@@ -44,6 +48,7 @@ private:
     QLabel* camera_err_label;
     QLabel* network_err_label;
 
+    int statusBarWidth();
 };
 
 #endif // SERVERGUI_H

@@ -92,7 +92,7 @@ void Server::ClientConnection()
 
     QTcpSocket *socket = nextPendingConnection();
 
-    if ( clientSocket != nullptr ) { // client already connected
+    if ( clientSocket != nullptr ) { // client already connected (but connection is still permitted for NewtonCam GUI)
         server_status_packet.SetStatus(SERVER_ERROR_BUSY,"Server is busy");
 
 #ifdef QT_DEBUG
