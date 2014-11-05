@@ -72,6 +72,11 @@ void Server::SetNetworkTimeout(const int timeout)
 }
 
 
+QAbstractSocket::SocketError Server::getLastServerError() const
+{
+    return lastServerError;
+}
+
                     /*  Private slots  */
 
 // macro for sending server status
@@ -117,6 +122,8 @@ void Server::ClientConnection()
 #endif
 
         SEND_STATUS(socket);
+        socket->disconnectFromHost();
+        return;
     }
 
 #ifdef QT_DEBUG

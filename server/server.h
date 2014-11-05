@@ -4,6 +4,7 @@
 #include "server_global.h"
 #include "netpacket.h"
 #include "netpackethandler.h"
+#include "../camera/camera.h"
 
 #include<iostream>
 #include<fstream>
@@ -41,6 +42,8 @@ public:
     explicit Server(QObject *parent = 0);
     Server(quint16 port, QObject *parent = 0);
     Server(QList<QHostAddress> &hosts, quint16 port = NETPROTOCOL_DEFAULT_PORT, QObject *parent = 0);
+
+    QAbstractSocket::SocketError getLastServerError() const;
 
     ~Server();
 

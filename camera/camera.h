@@ -4,9 +4,10 @@
 #include "camera_global.h"
 
 #include<iostream>
-#include<QObject>
 #include<ctime>
-
+#include<QObject>
+#include <QDateTime>
+#include <QString>
 
             /******************************************
             *                                         *
@@ -70,6 +71,7 @@ private:
 
 
     time_t time_point;
+    QString date_str;
 
     inline void Call_Andor_API(unsigned int err_code, const char *file, int line);
     inline void Call_Andor_API(unsigned int err_code, const char *api_func,

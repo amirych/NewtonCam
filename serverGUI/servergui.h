@@ -19,7 +19,7 @@
 
 class SERVERGUISHARED_EXPORT ServerGUI: public QMainWindow
 {
-
+    Q_OBJECT
 public:
     ServerGUI(QWidget *parent = 0);
     ServerGUI(int fontsize, QWidget *parent = 0);

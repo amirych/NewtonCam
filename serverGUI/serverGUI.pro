@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += widgets
+QT       += core widgets
 
 TARGET = serverGUI
 TEMPLATE = lib
