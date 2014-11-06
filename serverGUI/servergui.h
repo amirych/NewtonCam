@@ -13,6 +13,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGroupBox>
+#include <QAbstractSocket>
 
 
 #define SERVERGUI_DEFAULT_FONTSIZE 12
@@ -32,8 +33,10 @@ public slots:
     void LogMessage(QString msg);
     void TempChanged(double temp);
     void CoolerStatusChanged(unsigned int status);
-    void NetworkError(int err);
+    void NetworkError(QAbstractSocket::SocketError err);
     void ServerError(unsigned int err_code);
+    void ServerStatus(QString status);
+    void ExposureProgress(double progress);
 
 private:
     int fontSize;

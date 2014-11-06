@@ -39,12 +39,12 @@ enum ClientError {CLIENT_ERROR_OK, CLIENT_ERROR_INVALID_OPTION = 10, CLIENT_ERRO
     if ( !server_status_packet.isPacketValid() ) { \
         qDebug() << "PACKET ERROR: " << server_status_packet.GetPacketError();\
         qDebug() << "BAD SERVER STATUS PACKET!"; \
-        return CLIENT_ERROR_CONNECTION; \
+        exit(CLIENT_ERROR_CONNECTION); \
     } \
     status = server_status_packet.GetStatus(); \
     qDebug() << "<> SERVER RESPONDS: " << status; \
     if ( status != Server::SERVER_ERROR_OK ) {\
-        return status; \
+        exit(status); \
     } \
 }
 

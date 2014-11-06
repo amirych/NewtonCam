@@ -32,3 +32,5 @@ else:unix:!macx: LIBS += -L$$OUT_PWD/../net_protocol/ -lnet_protocol
 
 INCLUDEPATH += $$PWD/../net_protocol
 DEPENDPATH += $$PWD/../net_protocol
+
+INCLUDEPATH += $$PWD/../AndorSDK

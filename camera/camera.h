@@ -3,17 +3,29 @@
 
 #include "camera_global.h"
 
+
 #include<iostream>
 #include<ctime>
 #include<QObject>
 #include <QDateTime>
 #include <QString>
+#include <QDebug>
+
+
 
             /******************************************
             *                                         *
             *  Andor Newton camera API wrapper class  *
             *                                         *
             ******************************************/
+
+#define CAMERA_STATUS_UNINITILIZED_TEXT "Uninitialized"
+#define CAMERA_STATUS_INIT_TEXT         "Init ..."
+#define CAMERA_STATUS_READY_TEXT        "Ready"
+#define CAMERA_STATUS_ACQUISITION_TEXT  "Acquisition ..."
+#define CAMERA_STATUS_READING_TEXT      "Reading Image ..."
+#define CAMERA_STATUS_SAVING_TEXT       "Saving Image ..."
+#define CAERA_STATUS_FAILURE_TEXT       "Failure"
 
 class CAMERASHARED_EXPORT Camera: public QObject
 {
@@ -57,13 +69,17 @@ public:
     void ShutterClose();
 
 signals:
+    void CameraStatus(QString status);
     void CameraError(unsigned int err_code);
+    void TemperatureChanged(double temp);
+    void CoolerStatusChanged(unsigned int status);
+    void ExposureCounter(double counter);
 
 public slots:
     void StartExposure(const QString &fits_filename, const QString &hdr_filename = "");
     void StopExposure();
 
-private:
+protected:
     long Camera_Index;
     std::ostream *LogFile;
 

@@ -42,3 +42,5 @@ else:unix:!macx: LIBS += -L$$OUT_PWD/../camera/ -lcamera
 
 INCLUDEPATH += $$PWD/../camera
 DEPENDPATH += $$PWD/../camera
+
+INCLUDEPATH += $$PWD/../AndorSDK

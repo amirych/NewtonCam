@@ -7,6 +7,10 @@
 //    #include "atmcdLXd.h"
 //#endif
 
+#include <QString>
+#include <thread>
+#include <chrono>
+
 #ifdef Q_OS_WIN
     #include "atmcd32d.h"
 #endif
@@ -14,8 +18,6 @@
 #ifdef Q_OS_LINUX
     #include "atmcdLXd.h"
 #endif
-
-#include <QString>
 
             /* Andor API wrapper macro definition */
 
@@ -51,9 +53,50 @@
 Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     QObject(parent), Camera_Index(camera_index), LogFile(nullptr)
 {
+#ifdef QT_DEBUG
+    qDebug() << "Create Camera";
+#endif
+
     LogFile = &log_file;
 
+    emit CameraStatus(CAMERA_STATUS_UNINITILIZED_TEXT);
+//    LogFile = nullptr;
+
+}
+
+
+Camera::Camera(QObject *parent): Camera(std::cerr,0,parent)
+{
+}
+
+
+Camera::Camera(long camera_index, QObject *parent): Camera(std::cerr, camera_index, parent)
+{
+}
+
+
+Camera::~Camera()
+{
+    ANDOR_API_CALL(ShutDown,);
+    if ( LogFile != nullptr ) {
+        date_str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ");
+        *LogFile << date_str.toUtf8().data() << "Stop camera.\n";
+    }
+}
+
+            /*  public methods  */
+
+void Camera::InitCamera(std::ostream &log_file, long camera_index)
+{
+    LogFile = &log_file;
+    Camera_Index = camera_index;
+
+    lastError = DRV_SUCCESS;
+
+    // log header
     at_32 no_cameras;
+
+    emit CameraStatus(CAMERA_STATUS_INIT_TEXT);
 
     if ( LogFile != nullptr ) {
         *LogFile << "\n\n\n";
@@ -92,35 +135,20 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     }
 
     ANDOR_API_CALL(GetAvailableCameras,&no_cameras);
+#ifdef QT_DEBUG
+    qDebug() << "CAMERA: Number of found cameras: " << no_cameras;
+#endif
+
     ANDOR_API_CALL(Initialize,"");
-    std::cout << "Number of cameras: " << no_cameras << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    emit CameraStatus(CAMERA_STATUS_READY_TEXT);
 }
 
-
-Camera::Camera(QObject *parent): Camera(std::cerr,0,parent)
-{
-}
-
-
-Camera::Camera(long camera_index, QObject *parent): Camera(std::cerr, camera_index, parent)
-{
-}
-
-
-Camera::~Camera()
-{
-    ANDOR_API_CALL(ShutDown,);
-    if ( LogFile != nullptr ) {
-        date_str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ");
-        *LogFile << date_str.toUtf8().data() << "Stop camera.\n";
-    }
-}
-
-            /*  public methods  */
 
 void Camera::InitCamera(long camera_index)
 {
-
+    InitCamera(std::cerr,camera_index);
 }
 
 unsigned int Camera::GetLastError() const

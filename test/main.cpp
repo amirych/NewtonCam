@@ -54,7 +54,8 @@ int main(int argc, char *argv[])
     cout << "PACKET: " << stpk.GetByteView().data() << endl;
 
     ofstream ff("ss");
-    Camera cc(ff);
+//    Camera cc(ff);
+    Camera cc;
     ff.close();
 
     cout << "Camera last error: " << cc.GetLastError() << endl;

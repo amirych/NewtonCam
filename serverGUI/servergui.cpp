@@ -217,7 +217,7 @@ void ServerGUI::ServerError(unsigned int err_code)
 }
 
 
-void ServerGUI::NetworkError(int err)
+void ServerGUI::NetworkError(QAbstractSocket::SocketError err)
 {
     QString str;
     str.setNum(err);
@@ -227,6 +227,17 @@ void ServerGUI::NetworkError(int err)
     network_err_label->setText(str);
 }
 
+
+void ServerGUI::ServerStatus(QString status)
+{
+    cam_status_label->setText(status);
+}
+
+
+void ServerGUI::ExposureProgress(double progress)
+{
+    exp_progress->display(progress);
+}
 
 int ServerGUI::statusBarWidth()
 {

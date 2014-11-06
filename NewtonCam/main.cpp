@@ -13,6 +13,7 @@
 #include <QList>
 #include <QDialog>
 #include <QDateTime>
+#include <QRegExp>
 #include <iostream>
 
 
@@ -65,6 +66,10 @@ int main(int argc, char *argv[])
         if ( isreadable ) {
             QSettings config(pos_arg[0],QSettings::IniFormat);
 
+#ifdef QT_DEBUG
+            qDebug() << "Reading config from " << pos_arg[0];
+#endif
+
             fontsize = config.value("servergui/fontsize",SERVERGUI_DEFAULT_FONTSIZE).toInt(&ok);
             if ( !ok ) {
                 std::cerr << "Bad value of font size! Use of default value!\n";
@@ -91,10 +96,19 @@ int main(int argc, char *argv[])
 
             QString hosts = config.value("network/allowed_hosts",SERVER_DEFAULT_ALLOWED_HOST).toString();
 
+            // DNS lookup (WARNING: it is blocks current thread!)
+            QRegExp rx("\\s*\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\s*");
             QStringList list = hosts.split(",",QString::SkipEmptyParts);
-            foreach (QString str, list) {
-                allowed_hosts << QHostAddress(str);
+            foreach (const QString &str, list) {
+                ok = rx.exactMatch(str);
+                if ( !ok ) { // skip IP-addresses and lookup only hostnames
+                    QHostInfo info = QHostInfo::fromName(str);
+                    allowed_hosts.append(info.addresses());
+                } else allowed_hosts << QHostAddress(str);
             }
+#ifdef QT_DEBUG
+            qDebug() << "Allowed hosts from config: " << allowed_hosts;
+#endif
 
             cameraLogFilename = config.value("camera/log_file",CAMERA_DEFAULT_LOG_FILENAME).toString();
 
@@ -103,7 +117,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    Server CamServer(allowed_hosts,server_port,&app);
+    Server CamServer(allowed_hosts,server_port);
 
         /*  create GUI  */
 
@@ -115,12 +129,21 @@ int main(int argc, char *argv[])
         serverGUI->SetFonts(fontsize,statusFontsize,logFontsize);
         serverGUI->show();
 
-        QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
+        QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss:");
         serverGUI->LogMessage("<b>" + str + "</b>" + " Starting NewtonCam server ...");
 
+        QObject::connect(&CamServer,SIGNAL(CameraStatus(QString)),serverGUI,SLOT(ServerStatus(QString)));
+        QObject::connect(&CamServer,SIGNAL(TemperatureChanged(double)),serverGUI,SLOT(TempChanged(double)));
+        QObject::connect(&CamServer,SIGNAL(CoolerStatusChanged(unsigned int)),serverGUI,SLOT(CoolerStatusChanged(uint)));
         QObject::connect(&CamServer,SIGNAL(HelloIsReceived(QString)),serverGUI,SLOT(LogMessage(QString)));
+        QObject::connect(&CamServer,SIGNAL(InfoIsReceived(QString)),serverGUI,SLOT(LogMessage(QString)));
+        QObject::connect(&CamServer,SIGNAL(CameraError(unsigned int)),serverGUI,SLOT(ServerError(uint)));
+        QObject::connect(&CamServer,SIGNAL(ServerSocketError(QAbstractSocket::SocketError)),
+                         serverGUI,SLOT(NetworkError(QAbstractSocket::SocketError)));
+        app.processEvents();
     }
 
+    CamServer.InitCamera(std::cerr,0);
 
 //    if ( CamServer.getLastServerError() != Server::SERVER_ERROR_OK ) {
 //        std::cerr << "Camera server failed to start!\n";

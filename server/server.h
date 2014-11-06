@@ -12,6 +12,7 @@
 #include<QList>
 #include<QtNetwork/QTcpServer>
 #include<QtNetwork/QTcpSocket>
+#include <QtNetwork/QHostInfo>
 
 
 
@@ -30,7 +31,7 @@ SERVER_ERROR_DENIED - server denied connection (client IP is not in list of allo
 
 //using namespace std;
 
-class SERVERSHARED_EXPORT Server: public QTcpServer
+class SERVERSHARED_EXPORT Server: public Camera
 {
     Q_OBJECT
 public:
@@ -43,13 +44,13 @@ public:
     Server(quint16 port, QObject *parent = 0);
     Server(QList<QHostAddress> &hosts, quint16 port = NETPROTOCOL_DEFAULT_PORT, QObject *parent = 0);
 
-    QAbstractSocket::SocketError getLastServerError() const;
+    QAbstractSocket::SocketError getLastSocketError() const;
 
     ~Server();
 
     void SetNetworkTimeout(const int timeout);
 signals:
-    void ServerError(QAbstractSocket::SocketError err_code);
+    void ServerSocketError(QAbstractSocket::SocketError err_code);
     void HelloIsReceived(QString hello);
     void InfoIsReceived(QString info);
 
@@ -59,8 +60,8 @@ private slots:
     void ExecuteCommand();
     void GUIDisconnected();
 
-
 private:
+    QTcpServer *net_server;
     QTcpSocket *clientSocket;
     QList<QTcpSocket*> guiSocket;
 
@@ -70,7 +71,7 @@ private:
 
     QList<QHostAddress> allowed_hosts;
 
-    QAbstractSocket::SocketError lastServerError;
+    QAbstractSocket::SocketError lastSocketError;
 
     NetPacketHandler *packetHandler;
 };

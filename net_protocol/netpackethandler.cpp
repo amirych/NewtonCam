@@ -17,6 +17,7 @@ NetPacketHandler::NetPacketHandler(QObject *parent): NetPacketHandler(nullptr,pa
 
 NetPacketHandler::~NetPacketHandler()
 {
+//    qDebug() << "DISTR: " << packet << ", " << receive_queue;
     delete packet;
 
     if ( !receive_queue.empty() ) {
@@ -97,7 +98,6 @@ void NetPacketHandler::ReadDataStream()
     if ( packet->GetPacketError() == NetPacket::PACKET_ERROR_WAIT ) return; // wait for new data
 
     if ( packet->GetPacketError() != NetPacket::PACKET_ERROR_OK ) {
-        receive_queue << packet;
         return;
     }
 
@@ -129,115 +129,12 @@ void NetPacketHandler::ReadDataStream()
     default:
         break;
     }
-//    bool ok;
 
-//    lastError = NetPacketHandler::PACKET_ERROR_OK;
-
-//    if ( newPacket ) { // read header (ID and LEN fields)
-//        if ( current_socket->bytesAvailable() < (NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN) ) {
-//            lastError = NetPacketHandler::PACKET_ERROR_WAIT;
-//            return;
-//        }
-
-//        Packet = current_socket->read(NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN);
-//        if ( Packet.length() < (NETPROTOCOL_ID_FIELD_LEN + NETPROTOCOL_SIZE_FIELD_LEN) ) {
-//            lastError = NetPacketHandler::PACKET_ERROR_NETWORK;
-//            return;
-//        }
-
-
-//#ifdef QT_DEBUG
-//        qDebug() << "NETPACKET: read header [" << Packet << "]";
-//#endif
-
-//        long id_num = Packet.left(NETPROTOCOL_ID_FIELD_LEN).toLong(&ok);
-//        if ( !ok ) {
-//            lastError = NetPacketHandler::PACKET_ERROR_BAD_NUMERIC;
-//            return;
-//        }
-
-//        ID = static_cast<NetPacket::NetPacketID>(id_num);
-//        if ( ID >= NetPacket::PACKET_ID_UNKNOWN) {
-//            lastError = NetPacketHandler::PACKET_ERROR_UNKNOWN_PROTOCOL;
-//            return;
-//        }
-
-//        Content_LEN = Packet.right(NETPROTOCOL_SIZE_FIELD_LEN).toLong(&ok);
-//        if ( !ok ) {
-//            lastError = NetPacketHandler::PACKET_ERROR_BAD_NUMERIC;
-//            return;
-//        }
-
-//        if ( Content_LEN < 0 || Content_LEN > NETPROTOCOL_MAX_CONTENT_LEN ) {
-//            lastError = NetPacketHandler::PACKET_ERROR_UNKNOWN_PROTOCOL;
-//            return;
-//        }
-
-
-//        newPacket = false;
-
-//        if ( current_socket->bytesAvailable() < Content_LEN ) {
-//            lastError = NetPacketHandler::PACKET_ERROR_WAIT;
-//            return;
-//        }
-//    }
-
-//    Packet = current_socket->read(Content_LEN);
-//    if ( Packet.length() < Content_LEN ) {
-//        lastError = NetPacketHandler::PACKET_ERROR_NETWORK;
-//        newPacket = true; // restor handler state to "ready for new packet"
-//        return;
-//    }
-
-//    Content = Packet.data();
-//    lastError = NetPacketHandler::PACKET_ERROR_OK;
-
-//    // parse content
-//    switch (ID) {
-//    case NetPacket::PACKET_ID_INFO: {
-//        InfoNetPacket *pk = new InfoNetPacket(Content);
-//        receive_queue << pk;
-//        break;
-//    }
-//    case NetPacket::PACKET_ID_CMD: {
-//        QString cmd, args;
-
-//        SplitContent(cmd,args);
-
-//        CmdNetPacket *pk = new CmdNetPacket(cmd,args);
-//        receive_queue << pk;
-//        break;
-//    }
-//    case NetPacket::PACKET_ID_STATUS: {
-//        QString err_no_str, err_str;
-//        status_t err_no;
-
-//        SplitContent(err_no_str,err_str);
-
-//        bool ok;
-
-//        err_no = err_no_str.toLong(&ok);
-//        if ( !ok ) {
-//            lastError = NetPacketHandler::PACKET_ERROR_BAD_NUMERIC;
-//            break;
-//        }
-
-//        StatusNetPacket *pk =  new StatusNetPacket(err_no,err_str);
-//        receive_queue << pk;
-//        break;
-//    }
-//    case NetPacket::PACKET_ID_HELLO: {
-//        NetPacket *pk = new NetPacket(NetPacket::PACKET_ID_HELLO,Content);
-//        receive_queue << pk;
-//        break;
-//    }
-//    default:
-//        lastError = NetPacketHandler::PACKET_ERROR_UNKNOWN_PROTOCOL;
-//        break;
-//    }
-
+    packet = new NetPacket();
     newPacket = true;
+
     emit PacketIsReceived();
+
 
     // read remained data from socket
     if ( current_socket->bytesAvailable() ) ReadDataStream();
