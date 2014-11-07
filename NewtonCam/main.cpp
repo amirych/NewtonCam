@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
     int logFontsize = SERVERGUI_DEFAULT_FONTSIZE;
 
     QString cameraLogFilename = CAMERA_DEFAULT_LOG_FILENAME;
+    unsigned long temp_poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT;
 
     bool ok;
 
@@ -111,6 +112,12 @@ int main(int argc, char *argv[])
 #endif
 
             cameraLogFilename = config.value("camera/log_file",CAMERA_DEFAULT_LOG_FILENAME).toString();
+
+            temp_poll_int = config.value("camera/poll_interval",CAMERA_DEFAULT_TEMP_POLLING_INT).toUInt(&ok);
+            if ( !ok ) {
+                std::cerr << "Bad value of CCD chip temperature polling! Use of default value!\n";
+                temp_poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT;
+            }
 
         } else { // config file is given but not readable or cannot be found
             std::cerr << "Config file could not be found or user has no permissions for reading! Use default values!\n";

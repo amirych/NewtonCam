@@ -11,13 +11,13 @@
 #include <thread>
 #include <chrono>
 
-#ifdef Q_OS_WIN
-    #include "atmcd32d.h"
-#endif
+//#ifdef Q_OS_WIN
+//    #include "atmcd32d.h"
+//#endif
 
-#ifdef Q_OS_LINUX
-    #include "atmcdLXd.h"
-#endif
+//#ifdef Q_OS_LINUX
+//    #include "atmcdLXd.h"
+//#endif
 
             /* Andor API wrapper macro definition */
 
@@ -93,40 +93,43 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
 
     lastError = DRV_SUCCESS;
 
-    // log header
+    emit CameraStatus(CAMERA_STATUS_UNINITILIZED_TEXT);
+
     at_32 no_cameras;
+    char sdk_ver[100];
 
     emit CameraStatus(CAMERA_STATUS_INIT_TEXT);
 
+    // log header
     if ( LogFile != nullptr ) {
+        char* sp = "            ";
         *LogFile << "\n\n\n";
-        *LogFile << "***************************************************\n";
-        *LogFile << "*                                                 *\n";
-        *LogFile << "* NewtonCam: Andor Newton camera control software *\n";
-        *LogFile << "*                                                 *\n";
+        *LogFile << sp  << "***************************************************\n";
+        *LogFile << sp  << "*                                                 *\n";
+        *LogFile << sp  << "* NewtonCam: Andor Newton camera control software *\n";
+        *LogFile << sp  << "*                                                 *\n";
         QString str1,str2;
         str1.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
         str2.setNum(NEWTONCAM_PACKAGE_VERSION_MINOR);
         str1 += "." + str2;
         str2 = "* Version:                                        *\n";
         str2.replace(11,str1.length(),str1);
-        *LogFile << str2.toUtf8().data();
+        *LogFile << sp  << str2.toUtf8().data();
 
-        char sdk_ver[100];
         lastError = GetVersionInfo(AT_SDKVersion,sdk_ver,100);
         str1 = sdk_ver;
         str2 = "* Andor SDK version:                              *\n";
         str2.replace(21,str1.length(),str1);
-        *LogFile << str2.toUtf8().data();
+        *LogFile << sp  << str2.toUtf8().data();
 
-        lastError = GetVersionInfo(AT_DeviceDriverVersion,sdk_ver,100);
-        str1 = sdk_ver;
-        str2 = "* Andor device driver version:                    *\n";
-        str2.replace(31,str1.length(),str1);
-        *LogFile << str2.toUtf8().data();
+//        lastError = GetVersionInfo(AT_DeviceDriverVersion,sdk_ver,100);
+//        str1 = sdk_ver;
+//        str2 = "* Andor device driver version:                    *\n";
+//        str2.replace(31,str1.length(),str1);
+//        *LogFile << str2.toUtf8().data();
 
-        *LogFile << "*                                                 *\n";
-        *LogFile << "***************************************************\n";
+        *LogFile << sp  << "*                                                 *\n";
+        *LogFile << sp  << "***************************************************\n";
 
         *LogFile << "\n";
 
@@ -141,6 +144,8 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
 
     ANDOR_API_CALL(Initialize,"");
     std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    ANDOR_API_CALL(GetVersionInfo,AT_DeviceDriverVersion,sdk_ver,100);
 
     emit CameraStatus(CAMERA_STATUS_READY_TEXT);
 }
@@ -163,6 +168,12 @@ void Camera::SetCoolerOFF()
 }
 
 
+void Camera::SetCoolerON()
+{
+    ANDOR_API_CALL(CoolerON,);
+}
+
+
             /*  public slots  */
 
 void Camera::StartExposure(const QString &fits_filename, const QString &hdr_filename)
@@ -179,26 +190,26 @@ void Camera::StopExposure()
 
             /*  private methods  */
 
-void Camera::Call_Andor_API(unsigned int err_code, const char *file, int line)
-{
-    bool isSuccess = err_code == DRV_SUCCESS;
-    if ( isSuccess ) {
-        *LogFile << "Andor API: success " << ", in " << file << " at line " << line;
-    } else {
-        *LogFile << "Andor API: error = " << err_code << ", in " << file << " at line " << line;
-    }
-    *LogFile << std::endl << std::flush;
-}
+//void Camera::Call_Andor_API(unsigned int err_code, const char *file, int line)
+//{
+//    bool isSuccess = err_code == DRV_SUCCESS;
+//    if ( isSuccess ) {
+//        *LogFile << "Andor API: success " << ", in " << file << " at line " << line;
+//    } else {
+//        *LogFile << "Andor API: error = " << err_code << ", in " << file << " at line " << line;
+//    }
+//    *LogFile << std::endl << std::flush;
+//}
 
-void Camera::Call_Andor_API(unsigned int err_code, const char *api_func, const char *file, int line)
-{
-    bool isSuccess = err_code == DRV_SUCCESS;
-    if ( isSuccess ) {
-        *LogFile << "Andor API: [" << api_func << "]: OK " << " (in " << file
-                 << " at line " << line << ")";
-    } else {
-        *LogFile << "Andor API: [" << api_func << "]: error = " << err_code
-                 << " (in " << file << " at line " << line << ")";
-    }
-    *LogFile << std::endl << std::flush;
-}
+//void Camera::Call_Andor_API(unsigned int err_code, const char *api_func, const char *file, int line)
+//{
+//    bool isSuccess = err_code == DRV_SUCCESS;
+//    if ( isSuccess ) {
+//        *LogFile << "Andor API: [" << api_func << "]: OK " << " (in " << file
+//                 << " at line " << line << ")";
+//    } else {
+//        *LogFile << "Andor API: [" << api_func << "]: error = " << err_code
+//                 << " (in " << file << " at line " << line << ")";
+//    }
+//    *LogFile << std::endl << std::flush;
+//}

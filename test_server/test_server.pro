@@ -34,3 +34,4 @@ INCLUDEPATH += $$PWD/../net_protocol
 DEPENDPATH += $$PWD/../net_protocol
 
 INCLUDEPATH += $$PWD/../AndorSDK
+DEPENDPATH += $$PWD/../AndorSDK

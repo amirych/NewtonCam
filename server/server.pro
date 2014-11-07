@@ -5,7 +5,7 @@
 #-------------------------------------------------
 
 QT       -= gui
-QT       += network
+QT       += core network
 
 TARGET = server
 TEMPLATE = lib
@@ -18,15 +18,6 @@ SOURCES += server.cpp
 
 HEADERS += server.h\
         server_global.h
-
-unix:!symbian {
-    maemo5 {
-        target.path = /opt/usr/lib
-    } else {
-        target.path = /usr/lib
-    }
-    INSTALLS += target
-}
 
 
 win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../net_protocol/release/ -lnet_protocol
@@ -44,3 +35,4 @@ INCLUDEPATH += $$PWD/../camera
 DEPENDPATH += $$PWD/../camera
 
 INCLUDEPATH += $$PWD/../AndorSDK
+DEPENDPATH += $$PWD/../AndorSDK

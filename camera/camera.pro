@@ -14,10 +14,12 @@ QMAKE_CXXFLAGS += -std=c++11
 
 DEFINES += CAMERA_LIBRARY
 
-SOURCES += camera.cpp
+SOURCES += camera.cpp \
+    temppollingthread.cpp
 
 HEADERS += camera.h\
-        camera_global.h
+        camera_global.h \
+    temppollingthread.h
 
 unix:!symbian {
     maemo5 {

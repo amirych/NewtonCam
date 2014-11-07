@@ -5,6 +5,7 @@
 #include "netpacket.h"
 #include "netpackethandler.h"
 #include "../camera/camera.h"
+//#include "camera.h"
 
 #include<iostream>
 #include<fstream>
@@ -53,6 +54,7 @@ signals:
     void ServerSocketError(QAbstractSocket::SocketError err_code);
     void HelloIsReceived(QString hello);
     void InfoIsReceived(QString info);
+    void ServerLogMessage(QString msg);
 
 private slots:
     void ClientConnection();
