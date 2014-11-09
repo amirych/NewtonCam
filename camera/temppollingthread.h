@@ -17,7 +17,7 @@ public:
 
 private:
     unsigned long polling_interval; // in seconds
-    Camera *camera;
+    Camera* camera;
     bool stop_thread;
 };
 

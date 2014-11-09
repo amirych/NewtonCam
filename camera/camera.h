@@ -17,8 +17,9 @@
 #endif
 
 #ifdef Q_OS_LINUX
-    #include "atmcdLXd.h"
+    #include "../AndorSDK/atmcdLXd.h"
 #endif
+
 
 
             /******************************************
@@ -37,6 +38,9 @@
 
 
 #define CAMERA_DEFAULT_TEMP_POLLING_INT 10 // in seconds, default interval for CCD chip temperature polling
+
+// forward definitions
+class TempPollingThread;
 
 class CAMERASHARED_EXPORT Camera: public QObject
 {
@@ -101,6 +105,7 @@ protected:
     double currentTemperature;
     unsigned int currentCoolerStatus;
     QMutex tempMutex;
+    TempPollingThread *tempPolling;
 
     time_t time_point;
     QString date_str;
