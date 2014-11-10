@@ -23,10 +23,10 @@
 
             /* Andor API wrapper macro definition */
 
-//time_point = std::time(nullptr); \
-//*LogFile << std::asctime(std::localtime(&time_point)); \
-//date_str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: "); \
-//*LogFile << date_str.toUtf8().data(); \
+//time_point = std::time(nullptr);
+//*LogFile << std::asctime(std::localtime(&time_point));
+//date_str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ");
+//*LogFile << date_str.toUtf8().data();
 
 // current time point macro. It returns a char* string
 #define TIME_POINT QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ").toUtf8().data()
@@ -60,8 +60,9 @@
 
 Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     QObject(parent), Camera_Index(camera_index), LogFile(nullptr),
-    tempPolling(nullptr), statusPolling(nullptr),
+    tempPolling(nullptr),
     tempPollingInterval(CAMERA_DEFAULT_TEMP_POLLING_INT),
+    statusPolling(nullptr),
     statusPollingInterval(CAMERA_DEFAULT_STATUS_POLLING_INT)
 {
 #ifdef QT_DEBUG
@@ -120,7 +121,7 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
 
     // log header
     if ( LogFile != nullptr ) {
-        char* sp = "            ";
+        const char* sp[] = {"            "};
         *LogFile << "\n\n\n";
         *LogFile << sp  << "***************************************************\n";
         *LogFile << sp  << "*                                                 *\n";

@@ -67,13 +67,13 @@ private:
     QTcpSocket *clientSocket;
     QList<QTcpSocket*> guiSocket;
 
-    int NetworkTimeout;
-
     quint16 serverPort;
 
     QList<QHostAddress> allowed_hosts;
 
     QAbstractSocket::SocketError lastSocketError;
+
+    int NetworkTimeout;
 
     NetPacketHandler *packetHandler;
 };

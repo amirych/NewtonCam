@@ -5,7 +5,7 @@
 
 NetPacketHandler::NetPacketHandler(QTcpSocket *socket, QObject *parent):
     QObject(parent), current_socket(socket), receive_queue(QList<NetPacket*>()),
-    newPacket(true), lastError(PACKET_ERROR_OK)
+    lastError(PACKET_ERROR_OK), newPacket(true)
 {
     packet = new NetPacket();
 }

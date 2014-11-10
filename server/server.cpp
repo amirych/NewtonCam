@@ -31,9 +31,10 @@ static QList<QHostAddress> default_hosts_list = QList<QHostAddress>() << QHostAd
 
 Server::Server(QList<QHostAddress> &hosts, quint16 port, QObject *parent):
 //    QTcpServer(parent), serverPort(port), allowed_hosts(hosts),
-    Camera(parent), net_server(nullptr), serverPort(port), allowed_hosts(hosts),
-    guiSocket(QList<QTcpSocket*>()), clientSocket(nullptr),
-    packetHandler(nullptr), NetworkTimeout(NETPROTOCOL_TIMEOUT)
+    Camera(parent), net_server(nullptr),
+    clientSocket(nullptr), guiSocket(QList<QTcpSocket*>()),
+    serverPort(port), allowed_hosts(hosts),
+    NetworkTimeout(NETPROTOCOL_TIMEOUT), packetHandler(nullptr)
 {
 #ifdef QT_DEBUG
     qDebug() << "Start server";

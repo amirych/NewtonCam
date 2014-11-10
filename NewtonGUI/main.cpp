@@ -42,14 +42,16 @@ int main(int argc, char *argv[])
 
     port = cmdline_parser.value(portOption).toUInt(&ok);
     if ( !ok ) {
-        QMessageBox::StandardButton bt = QMessageBox::critical(0,"Error","Invalid port value!");
+//        QMessageBox::StandardButton bt =
+        QMessageBox::critical(0,"Error","Invalid port value!");
         exit(NEWTONGUI_ERROR_INVALID_PORT);
     }
 
 
     int fontsize = cmdline_parser.value(fontOption).toInt(&ok);
     if ( !ok ) {
-        QMessageBox::StandardButton bt = QMessageBox::critical(0,"Error","Invalid port value!");
+//        QMessageBox::StandardButton bt =
+        QMessageBox::critical(0,"Error","Invalid port value!");
         exit(NEWTONGUI_ERROR_INVALID_FONTSIZE);
     }
 

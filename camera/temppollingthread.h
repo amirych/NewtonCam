@@ -16,8 +16,8 @@ public:
     void stop();
 
 private:
-    unsigned long polling_interval; // in seconds
     Camera* camera;
+    unsigned long polling_interval; // in seconds
     bool stop_thread;
 };
 
