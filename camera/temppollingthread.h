@@ -9,7 +9,7 @@
 class TempPollingThread : public QThread
 {
 public:
-    TempPollingThread(Camera* cam, unsigned long poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT, QObject *parent = 0);
+    TempPollingThread(Camera* cam, unsigned long poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT);
 
     void setPollingInterval(unsigned long poll_int);
     void run();

@@ -47,6 +47,7 @@ ServerGUI::ServerGUI(int fontsize, QWidget *parent): QMainWindow(parent),
     font.setPointSize(statusFontSize);
     statusBar()->setFont(font);
     temperature_label = new QLabel(TEMPLAB_INIT_TEXT,cWidget);
+    temperature_label->setMargin(3);
     statusBar()->addWidget(temperature_label);
 
     cooler_label = new QLabel(COOLERLAB_INIT_TEXT,cWidget);
@@ -149,7 +150,7 @@ void ServerGUI::LogMessage(QString msg)
 void ServerGUI::TempChanged(double temp)
 {
     QString temp_str;
-    temp_str.setNum(temp);
+    temp_str.setNum(temp,'f',2);
     temp_str.prepend(TEMPLAB_ROOT_TEXT);
 
     temperature_label->setText(temp_str);

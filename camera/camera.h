@@ -38,9 +38,11 @@
 
 
 #define CAMERA_DEFAULT_TEMP_POLLING_INT 10 // in seconds, default interval for CCD chip temperature polling
+#define CAMERA_DEFAULT_STATUS_POLLING_INT 100 // in milliseconds, default interval for Newton-camera status polling
 
 // forward definitions
 class TempPollingThread;
+class StatusPollingThread;
 
 class CAMERASHARED_EXPORT Camera: public QObject
 {
@@ -57,16 +59,20 @@ public:
     void InitCamera(long camera_index = 0);
     void InitCamera(std::ostream &log_file, long camera_index = 0);
 
+    // general functions
+
     unsigned int GetLastError() const;
+
+    void SetPollingIntervals(const unsigned long temp_int, const unsigned long status_int);
 
     // Temperature and cooler control
 
     void SetCoolerON();
     void SetCoolerOFF();
 
-    void SetTemperature(const int temp);
+    void SetCCDTemperature(const int temp);
 
-    void GetTemperature(float *temp, unsigned int *cooler_stat);
+    void GetCCDTemperature(double *temp, unsigned int *cooler_stat);
 
     // frame control
 
@@ -74,6 +80,7 @@ public:
                   const int xstart, const int xend, const int ystart, const int yend);
 
     // acquisition control
+    void SetExpTime(const double exp_time);
 
     // read-out speed
 
@@ -106,9 +113,20 @@ protected:
     unsigned int currentCoolerStatus;
     QMutex tempMutex;
     TempPollingThread *tempPolling;
+    unsigned long tempPollingInterval;
+
+    StatusPollingThread *statusPolling;
+    unsigned long statusPollingInterval;
 
     time_t time_point;
     QString date_str;
 
+#ifdef EMULATOR
+    double tempSetPoint;
+
+    unsigned int currentStatus;
+
+    double currentExpTime;
+#endif
 };
 #endif // CAMERA_H

@@ -12,14 +12,17 @@ TEMPLATE = lib
 
 QMAKE_CXXFLAGS += -std=c++11
 
-DEFINES += CAMERA_LIBRARY
+#DEFINES += CAMERA_LIBRARY
+DEFINES += CAMERA_LIBRARY EMULATOR
 
 SOURCES += camera.cpp \
-    temppollingthread.cpp
+    temppollingthread.cpp \
+    statuspollingthread.cpp
 
 HEADERS += camera.h\
         camera_global.h \
-    temppollingthread.h
+    temppollingthread.h \
+    statuspollingthread.h
 
 unix:!symbian {
     maemo5 {
