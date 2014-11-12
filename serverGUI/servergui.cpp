@@ -1,10 +1,17 @@
 #include "servergui.h"
 
-#ifdef _WIN32 || _WIN64
+#ifdef Q_OS_WIN
     #include "../AndorSDK/atmcd32d.h"
-#else
+#endif
+
+#ifdef Q_OS_LINUX
     #include "../AndorSDK/atmcdLXd.h"
 #endif
+//#ifdef _WIN32 || _WIN64
+//    #include "../AndorSDK/atmcd32d.h"
+//#else
+//    #include "../AndorSDK/atmcdLXd.h"
+//#endif
 
 #include <QDebug>
 #include <QFontMetrics>
