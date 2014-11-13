@@ -19,6 +19,7 @@ NetPacketHandler::~NetPacketHandler()
 {
 //    qDebug() << "DISTR: " << packet << ", " << receive_queue;
     delete packet;
+    packet = nullptr;
 
     if ( !receive_queue.empty() ) {
         foreach (NetPacket *pk, receive_queue) {

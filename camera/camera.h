@@ -49,12 +49,13 @@ class CAMERASHARED_EXPORT Camera: public QObject
     Q_OBJECT
 
     friend class TempPollingThread;
+    friend class StatusPollingThread;
 public:
     explicit Camera(QObject *parent = 0);
     Camera(long camera_index, QObject *parent = 0);
     Camera(std::ostream &log_file, long camera_index = 0, QObject *parent = 0);
 
-    ~Camera();
+    virtual ~Camera();
 
     void InitCamera(long camera_index = 0);
     void InitCamera(std::ostream &log_file, long camera_index = 0);
@@ -62,6 +63,7 @@ public:
     // general functions
 
     unsigned int GetLastError() const;
+    QString GetCameraSatus() const;
 
     void SetPollingIntervals(const unsigned long temp_int, const unsigned long status_int);
 
@@ -121,6 +123,7 @@ protected:
     time_t time_point;
     QString date_str;
 
+    QString cameraStatus;
 #ifdef EMULATOR
     double tempSetPoint;
 

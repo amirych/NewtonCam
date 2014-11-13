@@ -56,13 +56,13 @@ signals:
     void InfoIsReceived(QString info);
     void ServerLogMessage(QString msg);
 
-private slots:
+protected slots:
     void ClientConnection();
     void ClientDisconnected();
     void ExecuteCommand();
     void GUIDisconnected();
 
-private:
+protected:
     QTcpServer *net_server;
     QTcpSocket *clientSocket;
     QList<QTcpSocket*> guiSocket;

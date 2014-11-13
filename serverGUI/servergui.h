@@ -27,6 +27,8 @@ public:
 
     void SetFonts(int fontsize, int status_fontsize, int log_fontsize);
 
+    void Reset(); // reset GUI widgets to default "unconnected" state
+
     ~ServerGUI();
 
 public slots:

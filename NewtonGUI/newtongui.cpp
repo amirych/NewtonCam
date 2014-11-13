@@ -39,13 +39,14 @@ void NewtonGui::Connect(QHostAddress &server_addr, quint16 port)
     if ( !socket->waitForConnected(NETPROTOCOL_TIMEOUT) ) {
         str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
         serverGUI->LogMessage("<b> " + str + ":</b> Can not connect to NewtonCam server!");
+        serverGUI->NetworkError(socket->error());
 //        QMessageBox::StandardButton bt =
         QMessageBox::critical(serverGUI,"Error","Can not connect to NewtonCam server!");
         emit Error(NEWTONGUI_ERROR_CANNOT_CONNECT);
 
-        serverGUI->TempChanged(-10.0003);
+//        serverGUI->TempChanged(-10.0003);
 
-        serverGUI->CoolerStatusChanged(20034);
+//        serverGUI->CoolerStatusChanged(20034);
 
         return;
     }
@@ -115,6 +116,7 @@ void NewtonGui::ServerDisconnected()
     QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
 
     serverGUI->LogMessage("<b> " + str + ":</b> NewtonCam server disconnected!");
+    serverGUI->Reset();
 }
 
 
@@ -128,8 +130,10 @@ void NewtonGui::ServerMsgIsReceived()
     switch (pk->GetPacketID()) {
         case NetPacket::PACKET_ID_STATUS: {
             StatusNetPacket *st_pk = static_cast<StatusNetPacket*>(pk);
-            unsigned int status = st_pk->GetStatus();
+            QString cameraStatus;
+            unsigned int status = st_pk->GetStatus(&cameraStatus);
             serverGUI->ServerError(status);
+            serverGUI->ServerStatus(cameraStatus);
             break;
         }
         case NetPacket::PACKET_ID_INFO: {

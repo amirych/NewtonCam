@@ -34,6 +34,7 @@ Server::Server(QList<QHostAddress> &hosts, quint16 port, QObject *parent):
     Camera(parent), net_server(nullptr),
     clientSocket(nullptr), guiSocket(QList<QTcpSocket*>()),
     serverPort(port), allowed_hosts(hosts),
+    lastSocketError(QAbstractSocket::UnknownSocketError),
     NetworkTimeout(NETPROTOCOL_TIMEOUT), packetHandler(nullptr)
 {
 #ifdef QT_DEBUG
@@ -49,6 +50,9 @@ Server::Server(QList<QHostAddress> &hosts, quint16 port, QObject *parent):
     net_server = new QTcpServer(this);
 
     if ( !net_server->listen(QHostAddress::Any,serverPort) ) {
+#ifdef QT_DEBUG
+        qDebug() << "CAN NOT START TO LISTEN!!!";
+#endif
         lastSocketError = net_server->serverError();
         emit ServerSocketError(lastSocketError);
         return;
@@ -75,9 +79,14 @@ Server::Server(QObject *parent): Server(default_hosts_list, NETPROTOCOL_DEFAULT_
 
 Server::~Server()
 {
+//    if ( !guiSocket.empty() ) {
+//        foreach (QTcpSocket *s, guiSocket) if ( s != nullptr ) s->disconnectFromHost();
+//    }
+
     if ( clientSocket != nullptr) {
         clientSocket->disconnectFromHost();
     }
+
 #ifdef QT_DEBUG
     qDebug() << "Stop server!";
 #endif
@@ -207,7 +216,21 @@ void Server::ClientConnection()
         connect(socket,SIGNAL(disconnected()),this,SLOT(GUIDisconnected()));
         hello_msg = "New NEWTON SERVER GUI connection from " + client_address.toString();
         emit HelloIsReceived(hello_msg);
-
+        // send server current state
+        server_status_packet.SetStatus(lastError,cameraStatus); // camera error and status
+        SEND_STATUS(socket);
+//        server_status_packet.SetStatus(lastSocketError,""); // network error
+//        SEND_STATUS(socket);
+//        server_status_packet.SetStatus(100,cameraStatus); // camera status
+//        SEND_STATUS(socket);
+        TempNetPacket temp(currentTemperature,currentCoolerStatus); // CCD temperature
+        ok = temp.Send(socket,NetworkTimeout);
+        if ( !ok ) {
+            qDebug() << "ERROR OF CAMERA TEMPERATURE SENDING! " << "Packet error: " << temp.GetPacketError();
+            lastSocketError = socket->error();
+            emit ServerSocketError(lastSocketError);
+            socket->disconnectFromHost();
+        }
     } else { // unknown, just reject
         socket->disconnectFromHost();
         return;

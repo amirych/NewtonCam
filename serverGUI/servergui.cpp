@@ -26,6 +26,7 @@
 #define COOLERLAB_INIT_TEXT  COOLERLAB_ROOT_TEXT"No connection  "
 #define ERRLAB_INIT_TEXT     ERRLAB_ROOT_TEXT"OK  "
 #define NETLAB_INIT_TEXT     NETLAB_ROOT_TEXT"OK  "
+#define CAM_STATUS_INIT_TEXT "<font color=red> Unknown </font>"
 //#define TEMPLAB_INIT_TEXT    "<b>  CCD Temp: </b> No connection  "
 //#define COOLERLAB_INIT_TEXT  "<b>  Cooler status: </b> No connection  "
 //#define ERRLAB_INIT_TEXT     "<b>  Err: </b>OK  "
@@ -85,7 +86,7 @@ ServerGUI::ServerGUI(int fontsize, QWidget *parent): QMainWindow(parent),
     exp_progress->setFixedHeight(40);
     exp_progress_layout->addWidget(exp_progress);
 
-    cam_status_label = new QLabel("<font color=red> Ready </font>",cam_status_gb);
+    cam_status_label = new QLabel(CAM_STATUS_INIT_TEXT,cam_status_gb);
     cam_status_label->setFrameShape(QFrame::Box);
     cam_status_label->setAlignment(Qt::AlignCenter);
     cam_status_layout->addWidget(cam_status_label);
@@ -146,6 +147,16 @@ void ServerGUI::SetFonts(int fontsize, int status_fontsize, int log_fontsize)
     this->repaint();
 }
 
+
+void ServerGUI::Reset()
+{
+    temperature_label->setText(TEMPLAB_INIT_TEXT);
+    cooler_label->setText(COOLERLAB_INIT_TEXT);
+    cam_status_label->setText(CAM_STATUS_INIT_TEXT);
+    camera_err_label->setText(ERRLAB_INIT_TEXT);
+    network_err_label->setText(NETLAB_INIT_TEXT);
+    exp_progress->display(0.0);
+}
 
 
 void ServerGUI::LogMessage(QString msg)
@@ -228,7 +239,7 @@ void ServerGUI::ServerError(unsigned int err_code)
 void ServerGUI::NetworkError(QAbstractSocket::SocketError err)
 {
     QString str;
-    str.setNum(err);
+    if ( err < 1000 ) str.setNum(err); else str = " OK";
 
     str.prepend(NETLAB_ROOT_TEXT);
 

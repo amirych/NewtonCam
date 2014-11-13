@@ -28,7 +28,7 @@ void StatusPollingThread::run()
     ret_status = GetStatus(&camera_status);
     if ( ret_status != DRV_SUCCESS ) exit(ret_status);
 
-    while ( camera_status == DRV_ACQUIRING ) {
+    while ( (camera_status == DRV_ACQUIRING) && !stop_thread ) {
         ret_status = GetStatus(&camera_status);
         if ( ret_status != DRV_SUCCESS ) exit(ret_status);
         QThread::msleep(polling_interval);

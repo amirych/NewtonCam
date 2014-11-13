@@ -60,10 +60,12 @@
 
 Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     QObject(parent), Camera_Index(camera_index), LogFile(nullptr),
+    tempMutex(),
     tempPolling(nullptr),
     tempPollingInterval(CAMERA_DEFAULT_TEMP_POLLING_INT),
     statusPolling(nullptr),
-    statusPollingInterval(CAMERA_DEFAULT_STATUS_POLLING_INT)
+    statusPollingInterval(CAMERA_DEFAULT_STATUS_POLLING_INT),
+    cameraStatus(CAMERA_STATUS_UNINITILIZED_TEXT)
 {
 #ifdef QT_DEBUG
     qDebug() << "Create Camera";
@@ -71,7 +73,8 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
 
     LogFile = &log_file;
 
-    emit CameraStatus(CAMERA_STATUS_UNINITILIZED_TEXT);
+    cameraStatus = CAMERA_STATUS_UNINITILIZED_TEXT;
+    emit CameraStatus(cameraStatus);
 //    LogFile = nullptr;
 
 }
@@ -89,11 +92,16 @@ Camera::Camera(long camera_index, QObject *parent): Camera(std::cerr, camera_ind
 
 Camera::~Camera()
 {
-    tempPolling->stop();
-    statusPolling->stop();
+    if ( tempPolling != nullptr ) {
+        tempPolling->stop();
+        tempPolling->wait(2000);
+    }
 
-    tempPolling->wait(2000);
-    statusPolling->wait(2000);
+    if ( statusPolling != nullptr ) {
+        statusPolling->stop();
+        statusPolling->wait(2000);
+    }
+
 
     ANDOR_API_CALL(ShutDown,);
     if ( LogFile != nullptr ) {
@@ -112,22 +120,25 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
 
     lastError = DRV_SUCCESS;
 
-    emit CameraStatus(CAMERA_STATUS_UNINITILIZED_TEXT);
+    cameraStatus = CAMERA_STATUS_UNINITILIZED_TEXT;
+    emit CameraStatus(cameraStatus);
 
     at_32 no_cameras;
     char sdk_ver[100];
 
-    emit CameraStatus(CAMERA_STATUS_INIT_TEXT);
+    cameraStatus = CAMERA_STATUS_INIT_TEXT;
+    emit CameraStatus(cameraStatus);
 
     // log header
     if ( LogFile != nullptr ) {
-        const char* sp[] = {"            "};
+//        const char* sp[] = {"            "};
+        char *sp = "            ";
+        QString str1,str2;
         *LogFile << "\n\n\n";
         *LogFile << sp  << "***************************************************\n";
         *LogFile << sp  << "*                                                 *\n";
         *LogFile << sp  << "* NewtonCam: Andor Newton camera control software *\n";
         *LogFile << sp  << "*                                                 *\n";
-        QString str1,str2;
         str1.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
         str2.setNum(NEWTONCAM_PACKAGE_VERSION_MINOR);
         str1 += "." + str2;
@@ -171,7 +182,7 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
         if ( LogFile != nullptr ) {
             *LogFile << TIME_POINT << "Cannot detect any cameras!\n";
             lastError = DRV_GENERAL_ERRORS;
-            return;
+//            return;
         }
     }
 
@@ -181,7 +192,7 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
     ANDOR_API_CALL(GetVersionInfo,AT_DeviceDriverVersion,sdk_ver,100);
 #endif
 
-    // start CCD chip temperaturepolling
+    // start CCD chip temperature polling
 
     if ( tempPolling == nullptr ) {
         tempPolling = new TempPollingThread(this,tempPollingInterval);
@@ -193,12 +204,16 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
 
     if ( statusPolling == nullptr ) {
         statusPolling = new StatusPollingThread(this,statusPollingInterval);
+    } else {
+        statusPolling->stop();
     }
 
-    emit CameraStatus(CAMERA_STATUS_READY_TEXT);
+    cameraStatus = CAMERA_STATUS_READY_TEXT;
+    emit CameraStatus(cameraStatus);
 
 #ifdef EMULATOR
     tempSetPoint = -30.0;
+    currentExpTime = 0.0;
 #endif
 }
 
@@ -213,6 +228,10 @@ unsigned int Camera::GetLastError() const
     return lastError;
 }
 
+QString Camera::GetCameraSatus() const
+{
+    return cameraStatus;
+}
 
 void Camera::SetPollingIntervals(const unsigned long temp_int, const unsigned long status_int)
 {
@@ -256,9 +275,20 @@ void Camera::GetCCDTemperature(double *temp, unsigned int *cooler_stat)
 #else
     float curr_temp;
     currentCoolerStatus = GetTemperatureF(&curr_temp);
-    currentTemperature = static_cast<double>(curr_temp);
-    cooler_stat = currentCoolerStatus;
-    *temp = currentTemperature;
+    switch ( currentCoolerStatus ) {
+        case DRV_NOT_INITIALIZED:
+        case DRV_ACQUIRING:
+        case DRV_ERROR_ACK: {
+            lastError = currentCoolerStatus;
+            emit CameraError(lastError);
+            break;
+        }
+        default: { // here one has real temperature value
+            currentTemperature = static_cast<double>(curr_temp);
+            *temp = currentTemperature;
+        }
+    }
+    *cooler_stat = currentCoolerStatus;
 #endif
 }
 

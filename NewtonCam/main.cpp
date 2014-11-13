@@ -126,6 +126,10 @@ int main(int argc, char *argv[])
 
     Server CamServer(allowed_hosts,server_port);
 
+#ifdef QT_DEBUG
+    qDebug() << "NETWORK SERVER START STATUS: " << CamServer.getLastSocketError();
+#endif
+
         /*  create GUI  */
 
     ServerGUI *serverGUI;
