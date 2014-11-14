@@ -14,7 +14,9 @@
 #include <QDialog>
 #include <QDateTime>
 #include <QRegExp>
+#include <QObject>
 #include <iostream>
+#include <csignal>
 
 
 #define CAMERA_DEFAULT_LOG_FILENAME "NewtonCam.log"
@@ -25,10 +27,64 @@
                 *                                       *
                 ****************************************/
 
+static QApplication *myApp;
+
+// POSIX OS signal handler
+#ifdef Q_OS_UNIX
+void signal_handler_int(int signal) // Ctrl-C signal handler (cross-platform)
+{
+//    std::cerr << "I received signal " << signal << '\n';
+    myApp->quit();
+}
+
+void signal_handler_term(int signal)
+{
+//    std::cerr << "I received signal " << signal << '\n';
+    myApp->quit();
+}
+#endif
+
+// Windows OS signal handler (from MDSN)
+#ifdef Q_OS_WIN
+#include <Windows.h>
+
+BOOL CtrlHandler( DWORD fdwCtrlType )
+{
+  switch( fdwCtrlType )
+  {
+    // Handle the CTRL-C signal.
+    case CTRL_C_EVENT:
+      myApp->quit();
+      return TRUE ;
+
+    // CTRL-CLOSE: confirm that the user wants to exit.
+    case CTRL_CLOSE_EVENT:
+      myApp->quit();
+      return TRUE;
+
+    // Pass other signals to the next handler.
+    case CTRL_BREAK_EVENT:
+      myApp->quit();
+      return TRUE;
+
+    case CTRL_LOGOFF_EVENT:
+      myApp->quit();
+      return FALSE;
+
+    case CTRL_SHUTDOWN_EVENT:
+      myApp->quit();
+      return FALSE;
+
+    default:
+      return FALSE;
+  }
+}
+#endif
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    myApp = &app;
 
             /*  commandline options definition  */
 
@@ -113,7 +169,7 @@ int main(int argc, char *argv[])
 
             cameraLogFilename = config.value("camera/log_file",CAMERA_DEFAULT_LOG_FILENAME).toString();
 
-            temp_poll_int = config.value("camera/poll_interval",CAMERA_DEFAULT_TEMP_POLLING_INT).toUInt(&ok);
+            temp_poll_int = config.value("camera/temp_poll_interval",CAMERA_DEFAULT_TEMP_POLLING_INT).toUInt(&ok);
             if ( !ok ) {
                 std::cerr << "Bad value of CCD chip temperature polling! Use of default value!\n";
                 temp_poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT;
@@ -161,6 +217,18 @@ int main(int argc, char *argv[])
 //        exit(CamServer.getLastServerError());
 //    }
 
+#ifdef Q_OS_UNIX
+    std::signal(SIGINT, signal_handler_int);
+    std::signal(SIGTERM, signal_handler_term);
+#endif
+
+#ifdef Q_OS_WIN
+    if( !SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) ) {
+#ifdef QT_DEBUG
+        qDebug() << "Can not install OS signal handler!";
+#endif
+    }
+#endif
 
     return app.exec();
 }

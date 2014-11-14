@@ -13,7 +13,7 @@ QMAKE_CXXFLAGS += -std=c++11
 
 TARGET = NewtonCam
 CONFIG   += console
-CONFIG   -= app_bundle
+#CONFIG   -= app_bundle
 
 TEMPLATE = app
 
