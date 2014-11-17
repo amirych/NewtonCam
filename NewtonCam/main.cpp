@@ -16,10 +16,12 @@
 #include <QRegExp>
 #include <QObject>
 #include <iostream>
+#include <fstream>
 #include <csignal>
 
 
 #define CAMERA_DEFAULT_LOG_FILENAME "NewtonCam.log"
+#define CAMERA_DEFAULT_INIT_PATH ""
 
                 /****************************************
                 *                                       *
@@ -115,6 +117,8 @@ int main(int argc, char *argv[])
     QString cameraLogFilename = CAMERA_DEFAULT_LOG_FILENAME;
     unsigned long temp_poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT;
 
+    QString cameraInitPath = CAMERA_DEFAULT_INIT_PATH;
+
     bool ok;
 
     if ( !pos_arg.isEmpty() && QFile::exists(pos_arg[0]) ) {
@@ -166,6 +170,7 @@ int main(int argc, char *argv[])
 #ifdef QT_DEBUG
             qDebug() << "Allowed hosts from config: " << allowed_hosts;
 #endif
+            cameraInitPath = config.value("camera/init_path",CAMERA_DEFAULT_INIT_PATH).toString();
 
             cameraLogFilename = config.value("camera/log_file",CAMERA_DEFAULT_LOG_FILENAME).toString();
 
@@ -180,7 +185,32 @@ int main(int argc, char *argv[])
         }
     }
 
-    Server CamServer(allowed_hosts,server_port);
+#ifdef QT_DEBUG
+    qDebug() << "Use log-file: " << cameraLogFilename;
+#endif
+    // open log-file
+
+    std::ostream *LogFile;
+    std::ofstream log_file;
+
+
+    if ( cameraLogFilename.isEmpty() || cameraLogFilename.isNull() ||
+         (!cameraLogFilename.compare("STD::CERR",Qt::CaseInsensitive) ) ) {
+        LogFile = &std::cerr;
+    } else if ( !cameraLogFilename.compare("STD::COUT",Qt::CaseInsensitive) ) {
+        LogFile = &std::cout;
+    } else {
+        log_file.open(cameraLogFilename.toUtf8().data(),std::ios_base::app);
+        if ( !log_file.is_open() ) {
+            qDebug() << "Can not open Log-file!!! Use of standard error output!";
+            LogFile = &std::cerr;
+        } else {
+            LogFile = &log_file;
+        }
+    }
+
+    Server CamServer(*LogFile,allowed_hosts,server_port);
+//    Server CamServer(std::cerr,allowed_hosts,server_port);
 
 #ifdef QT_DEBUG
     qDebug() << "NETWORK SERVER START STATUS: " << CamServer.getLastSocketError();
@@ -210,7 +240,7 @@ int main(int argc, char *argv[])
         app.processEvents();
     }
 
-    CamServer.InitCamera(std::cerr,0);
+    CamServer.InitCamera(cameraInitPath,0);
 
 //    if ( CamServer.getLastServerError() != Server::SERVER_ERROR_OK ) {
 //        std::cerr << "Camera server failed to start!\n";

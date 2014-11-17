@@ -23,21 +23,16 @@
 
             /* Andor API wrapper macro definition */
 
-//time_point = std::time(nullptr);
-//*LogFile << std::asctime(std::localtime(&time_point));
-//date_str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ");
-//*LogFile << date_str.toUtf8().data();
-
 // current time point macro. It returns a char* string
-#define TIME_POINT QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ").toUtf8().data()
+#define TIME_STAMP QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ").toUtf8().data()
 
 
 #define ANDOR_API_CALL(API_FUNC, ...) { \
     lastError = API_FUNC(__VA_ARGS__); \
     emit CameraError(lastError); \
     if ( LogFile != nullptr ) { \
-        *LogFile << TIME_POINT; \
-        *LogFile << "   [Andor API] " << #API_FUNC << "(" << #__VA_ARGS__ << "): "; \
+        *LogFile << TIME_STAMP; \
+        *LogFile << "[Andor API] " << #API_FUNC << "(" << #__VA_ARGS__ << "): "; \
         if ( lastError == DRV_SUCCESS ) { \
             *LogFile << "OK "; \
         } else { \
@@ -47,7 +42,20 @@
     }\
 }
 
-
+//#define ANDOR_API_CALL(API_FUNC, ...) { \
+//    lastError = API_FUNC(__VA_ARGS__); \
+//    emit CameraError(lastError); \
+//    LogOutput("   [Andor API] " + #API_FUNC + "(" + #__VA_ARGS__ + "): ", true, false); \
+//    if ( lastError == DRV_SUCCESS ) { \
+//        LogOutput("OK ", false, false); \
+//    } else { \
+//        QString str; \
+//        str.setNum(lastError); \
+//        str.prepend("error = "); \
+//        LogOutput(str,false,false); \
+//    } \
+//    LogOutput(" (in " + __FILE__ + " at line " + __LINE__ + ")", false); \
+//}
 
 
             /********************************
@@ -74,7 +82,7 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     LogFile = &log_file;
 
     cameraStatus = CAMERA_STATUS_UNINITILIZED_TEXT;
-    emit CameraStatus(cameraStatus);
+//    emit CameraStatus(cameraStatus);
 //    LogFile = nullptr;
 
 }
@@ -104,18 +112,18 @@ Camera::~Camera()
 
 
     ANDOR_API_CALL(ShutDown,);
-    if ( LogFile != nullptr ) {
-        *LogFile << TIME_POINT << "Stop camera.\n";
-//        date_str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ");
-//        *LogFile << date_str.toUtf8().data() << "Stop camera.\n";
-    }
+    LogOutput("",false);
+    LogOutput("Stop camera.");
+//    if ( LogFile != nullptr ) {
+//        *LogFile << TIME_STAMP << "Stop camera.\n";
+//    }
 }
 
             /*  public methods  */
 
-void Camera::InitCamera(std::ostream &log_file, long camera_index)
+void Camera::InitCamera(QString init_path, long camera_index)
 {
-    LogFile = &log_file;
+    initPath = init_path;
     Camera_Index = camera_index;
 
     lastError = DRV_SUCCESS;
@@ -163,9 +171,7 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
 
         *LogFile << "\n";
 
-        *LogFile << TIME_POINT << "Starting camera ...\n\n";
-//        str1 = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ");
-//        *LogFile << str1.toUtf8().data() << "Starting camera ...\n\n";
+        *LogFile << TIME_STAMP << "Starting camera ...\n\n" << std::flush;
     }
 
     ANDOR_API_CALL(GetAvailableCameras,&no_cameras);
@@ -174,19 +180,22 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
 #endif
 
 #ifdef EMULATOR
-    if ( LogFile != nullptr ) {
-        *LogFile << TIME_POINT << "EMULATOR: start emulation mode!\n";
-    }
+//    if ( LogFile != nullptr ) {
+//        *LogFile << TIME_STAMP << "EMULATOR: start emulation mode!\n";
+//    }
+    LogOutput("EMULATOR: start emulation mode!");
 #else
     if ( !no_cameras || (lastError != DRV_SUCCESS) ) { // camera is not detected!
-        if ( LogFile != nullptr ) {
-            *LogFile << TIME_POINT << "Cannot detect any cameras!\n";
-            lastError = DRV_GENERAL_ERRORS;
-//            return;
-        }
+        LogOutput("   [CAMERA] Cannot detect any cameras!");
+//        if ( LogFile != nullptr ) {
+//            *LogFile << TIME_STAMP << "Cannot detect any cameras!\n";
+//            lastError = DRV_GENERAL_ERRORS;
+////            return;
+//        }
     }
 
-    ANDOR_API_CALL(Initialize,"");
+    char* path = initPath.toUtf8().data();
+    ANDOR_API_CALL(Initialize,path);
     std::this_thread::sleep_for(std::chrono::seconds(2)); // wait for init proccess finished
 
     ANDOR_API_CALL(GetVersionInfo,AT_DeviceDriverVersion,sdk_ver,100);
@@ -220,7 +229,7 @@ void Camera::InitCamera(std::ostream &log_file, long camera_index)
 
 void Camera::InitCamera(long camera_index)
 {
-    InitCamera(std::cerr,camera_index);
+    InitCamera("",camera_index);
 }
 
 unsigned int Camera::GetLastError() const
@@ -257,7 +266,7 @@ void Camera::SetCCDTemperature(const int temp)
 #ifdef EMULATOR
     if ( LogFile != nullptr ) {
         tempSetPoint = temp;
-        *LogFile << TIME_POINT << "EMULATOR: Set CCD temperature: " << temp << " degrees\n";
+        *LogFile << TIME_STAMP << "EMULATOR: Set CCD temperature: " << temp << " degrees\n";
     }
 #else
     ANDOR_API_CALL(SetTemperature,temp);
@@ -324,6 +333,28 @@ void Camera::StopExposure()
 
 
 
+            /*  protected methods  */
+
+void Camera::LogOutput(QString log_str, bool time_stamp, bool new_line)
+{
+    if ( LogFile != nullptr ) {
+        if ( time_stamp ) *LogFile << QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ").toUtf8().data();
+        *LogFile << log_str.toUtf8().data();
+        if ( new_line ) *LogFile << std::endl;
+        *LogFile << std::flush;
+    }
+}
+
+
+void Camera::LogOutput(QStringList &log_strs)
+{
+    if ( LogFile != nullptr ) {
+        foreach (QString str, log_strs) {
+            LogOutput(str,false);
+        }
+        LogOutput("",false);
+    }
+}
 
             /*  private methods  */
 

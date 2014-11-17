@@ -29,9 +29,9 @@ static QList<QHostAddress> default_hosts_list = QList<QHostAddress>() << QHostAd
 
                         /*  Constructors and destructor  */
 
-Server::Server(QList<QHostAddress> &hosts, quint16 port, QObject *parent):
+Server::Server(std::ostream &log_file, QList<QHostAddress> &hosts, quint16 port, QObject *parent):
 //    QTcpServer(parent), serverPort(port), allowed_hosts(hosts),
-    Camera(parent), net_server(nullptr),
+    Camera(log_file,0,parent), net_server(nullptr),
     clientSocket(nullptr), guiSocket(QList<QTcpSocket*>()),
     serverPort(port), allowed_hosts(hosts),
     lastSocketError(QAbstractSocket::UnknownSocketError),
@@ -66,13 +66,19 @@ Server::Server(QList<QHostAddress> &hosts, quint16 port, QObject *parent):
 }
 
 
-Server::Server(quint16 port, QObject *parent): Server(default_hosts_list, port, parent)
+Server::Server(QList<QHostAddress> &hosts, quint16 port, QObject *parent):
+    Server(std::cerr,hosts,port,parent)
+{
+
+}
+
+Server::Server(quint16 port, QObject *parent): Server(std::cerr, default_hosts_list, port, parent)
 {
 
 }
 
 
-Server::Server(QObject *parent): Server(default_hosts_list, NETPROTOCOL_DEFAULT_PORT, parent)
+Server::Server(QObject *parent): Server(std::cerr, default_hosts_list, NETPROTOCOL_DEFAULT_PORT, parent)
 {
 }
 
@@ -295,7 +301,7 @@ void Server::ExecuteCommand()
         if ( command_name == NETPROTOCOL_COMMAND_STOP ) {
 
         } else if ( command_name == NETPROTOCOL_COMMAND_INIT ) {
-            InitCamera(*LogFile,Camera_Index);
+            InitCamera();
             last_oper_status = (lastError == DRV_SUCCESS) ? Server::SERVER_ERROR_OK : lastError;
             server_status_packet.SetStatus(last_oper_status,"");
             SEND_STATUS(clientSocket);

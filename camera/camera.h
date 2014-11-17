@@ -5,7 +5,6 @@
 
 
 #include<iostream>
-#include<ctime>
 #include<QObject>
 #include <QDateTime>
 #include <QString>
@@ -58,7 +57,7 @@ public:
     virtual ~Camera();
 
     void InitCamera(long camera_index = 0);
-    void InitCamera(std::ostream &log_file, long camera_index = 0);
+    void InitCamera(QString init_path, long camera_index = 0);
 
     // general functions
 
@@ -120,10 +119,13 @@ protected:
     StatusPollingThread *statusPolling;
     unsigned long statusPollingInterval;
 
-    time_t time_point;
-    QString date_str;
-
     QString cameraStatus;
+
+    QString initPath;
+
+    void LogOutput(QString log_str, bool time_stamp = true, bool new_line = true);
+    void LogOutput(QStringList &log_strs);
+
 #ifdef EMULATOR
     double tempSetPoint;
 
@@ -132,4 +134,5 @@ protected:
     double currentExpTime;
 #endif
 };
+
 #endif // CAMERA_H
