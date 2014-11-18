@@ -13,7 +13,7 @@ TEMPLATE = lib
 QMAKE_CXXFLAGS += -std=c++11
 
 DEFINES += CAMERA_LIBRARY
-#DEFINES += CAMERA_LIBRARY EMULATOR
+DEFINES += EMULATOR_MODE
 
 SOURCES += camera.cpp \
     temppollingthread.cpp \

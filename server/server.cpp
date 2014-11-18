@@ -1,5 +1,6 @@
 #include "server.h"
 #include "netpacket.h"
+#include "../version.h"
 
 #include<QDebug>
 
@@ -35,7 +36,8 @@ Server::Server(std::ostream &log_file, QList<QHostAddress> &hosts, quint16 port,
     clientSocket(nullptr), guiSocket(QList<QTcpSocket*>()),
     serverPort(port), allowed_hosts(hosts),
     lastSocketError(QAbstractSocket::UnknownSocketError),
-    NetworkTimeout(NETPROTOCOL_TIMEOUT), packetHandler(nullptr)
+    NetworkTimeout(NETPROTOCOL_TIMEOUT), packetHandler(nullptr),
+    serverVersionString(QString(""))
 {
 #ifdef QT_DEBUG
     qDebug() << "Start server";
@@ -49,12 +51,20 @@ Server::Server(std::ostream &log_file, QList<QHostAddress> &hosts, quint16 port,
     // start listenning
     net_server = new QTcpServer(this);
 
+    LogOutput("   [SERVER] Start server ...");
+
+    if ( net_server == nullptr ) {
+        LogOutput("   [SERVER] Cannot start server! Cannot create QTcpServer object!!!");
+        return;
+    }
+
     if ( !net_server->listen(QHostAddress::Any,serverPort) ) {
 #ifdef QT_DEBUG
         qDebug() << "CAN NOT START TO LISTEN!!!";
-#endif
-        lastSocketError = net_server->serverError();
+#endif        
+        lastSocketError = net_server->serverError();        
         emit ServerSocketError(lastSocketError);
+        LogOutput("   [SERVER] Cannot start listening! Socket error: " + net_server->errorString());
         return;
     }
 
@@ -63,6 +73,11 @@ Server::Server(std::ostream &log_file, QList<QHostAddress> &hosts, quint16 port,
     connect(net_server,SIGNAL(newConnection()),this,SLOT(ClientConnection()));
 
     connect(packetHandler,SIGNAL(PacketIsReceived()),this,SLOT(ExecuteCommand()));
+
+    serverVersionString.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
+    QString str;
+    str.setNum(NEWTONCAM_PACKAGE_VERSION_MINOR);
+    serverVersionString += "." + str;
 }
 
 
@@ -93,6 +108,7 @@ Server::~Server()
         clientSocket->disconnectFromHost();
     }
 
+    LogOutput("   [SERVER] Stop server.");
 #ifdef QT_DEBUG
     qDebug() << "Stop server!";
 #endif
@@ -132,59 +148,10 @@ void Server::ClientConnection()
     StatusNetPacket server_status_packet;
 
     QTcpSocket *socket = net_server->nextPendingConnection();
-
-    if ( clientSocket != nullptr ) { // client already connected (but connection is still permitted for NewtonCam GUI)
-        server_status_packet.SetStatus(SERVER_ERROR_BUSY,"Server is busy");
-
-#ifdef QT_DEBUG
-        qDebug() << "SERVER MSG: Other client is already connected!";
-        qDebug() << "SERVER SENT: " << server_status_packet.GetByteView();
-#endif
-
-        SEND_STATUS(socket);
-    }
-
     QHostAddress client_address = socket->peerAddress();
 
-#ifdef QT_DEBUG
-    qDebug() << "SERVER: connection from " << client_address;
-//    qDebug() << "allowed_hosts: " << allowed_hosts;
-#endif
-
-    if ( !allowed_hosts.contains(client_address) ) { // check for client is in allowed host list
-        server_status_packet.SetStatus(SERVER_ERROR_DENIED,"Server refused the connection");
-#ifdef QT_DEBUG
-        qDebug() << "SERVER MSG: client address is not allowed!";
-        qDebug() << "SERVER SENT: " << server_status_packet.GetByteView();
-#endif
-
-        SEND_STATUS(socket);
-        socket->disconnectFromHost();
-        return;
-    }
-
-#ifdef QT_DEBUG
-    qDebug() << "SERVER: client IP is valid!";
-#endif
-
-            /*  hand-shake with new connection  */
-
-    // send server HELLO message
-
-    HelloNetPacket hello(NETPROTOCOL_SENDER_TYPE_SERVER,"");
-    ok = hello.Send(socket,NetworkTimeout);
-    if ( !ok ) {
-        lastSocketError = socket->error();
-        emit ServerSocketError(lastSocketError);
-        socket->disconnectFromHost();
-        return;
-    }
-
-#ifdef QT_DEBUG
-    qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
-#endif
-
     // who asked for connection. Receive HELLO message from client
+    HelloNetPacket hello;
 
     hello.Receive(socket,NetworkTimeout);
     if ( !hello.isPacketValid() ) {
@@ -199,15 +166,60 @@ void Server::ClientConnection()
 
     QString senderVersion;
     QString senderType = hello.GetSenderType(&senderVersion);
+
     QString hello_msg;
     server_status_packet.SetStatus(SERVER_ERROR_OK,"OK");
 
     if ( senderType == NETPROTOCOL_SENDER_TYPE_CLIENT ) {
-        hello_msg = "<b>" + QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss:") + "</b>";
-        hello_msg += " New NEWTON CLIENT connection from " + client_address.toString();
+        if ( clientSocket != nullptr ) { // client already connected
+            server_status_packet.SetStatus(SERVER_ERROR_BUSY,"Server is busy");
+
+#ifdef QT_DEBUG
+            qDebug() << "SERVER MSG: Other client is already connected!";
+            qDebug() << "SERVER SENT: " << server_status_packet.GetByteView();
+#endif
+
+            SEND_STATUS(socket);
+            socket->disconnectFromHost();
+            return;
+        }
+
+        // check for client address is in allowed list
+        if ( !allowed_hosts.contains(client_address) ) { // check for client is in allowed host list
+            server_status_packet.SetStatus(SERVER_ERROR_DENIED,"Server refused the connection");
+
+#ifdef QT_DEBUG
+            qDebug() << "SERVER MSG: client address is not allowed!";
+            qDebug() << "SERVER SENT: " << server_status_packet.GetByteView();
+#endif
+
+            SEND_STATUS(socket);
+            socket->disconnectFromHost();
+            return;
+        }
+
+        // send server HELLO message
+
+        hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_SERVER,serverVersionString);
+        ok = hello.Send(socket,NetworkTimeout);
+        if ( !ok ) {
+            lastSocketError = socket->error();
+            emit ServerSocketError(lastSocketError);
+            socket->disconnectFromHost();
+            return;
+        }
+
+#ifdef QT_DEBUG
+        qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
+#endif
+
+        hello_msg = "<b>";
+        hello_msg += TIME_STAMP;
+        hello_msg += "</b>";
+        hello_msg += "New NEWTON CLIENT connection from " + client_address.toString();
         emit HelloIsReceived(hello_msg);
 
-        SEND_STATUS(socket);
+//        SEND_STATUS(socket);
 
         clientSocket = socket;
 
@@ -218,10 +230,30 @@ void Server::ClientConnection()
         connect(clientSocket,SIGNAL(readyRead()),packetHandler,SLOT(ReadDataStream()));
 
     } else if ( senderType == NETPROTOCOL_SENDER_TYPE_GUI ) {
+        // send server HELLO message
+
+        hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_SERVER,serverVersionString);
+        ok = hello.Send(socket,NetworkTimeout);
+        if ( !ok ) {
+            lastSocketError = socket->error();
+            emit ServerSocketError(lastSocketError);
+            socket->disconnectFromHost();
+            return;
+        }
+
+#ifdef QT_DEBUG
+        qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
+#endif
+
         guiSocket << socket;
         connect(socket,SIGNAL(disconnected()),this,SLOT(GUIDisconnected()));
-        hello_msg = "New NEWTON SERVER GUI connection from " + client_address.toString();
+
+        hello_msg = "<b>";
+        hello_msg += TIME_STAMP;
+        hello_msg += "</b>";
+        hello_msg += "New NEWTON SERVER GUI connection from " + client_address.toString();
         emit HelloIsReceived(hello_msg);
+
         // send server current state
         server_status_packet.SetStatus(lastError,cameraStatus); // camera error and status
         SEND_STATUS(socket);
@@ -229,7 +261,14 @@ void Server::ClientConnection()
 //        SEND_STATUS(socket);
 //        server_status_packet.SetStatus(100,cameraStatus); // camera status
 //        SEND_STATUS(socket);
-        TempNetPacket temp(currentTemperature,currentCoolerStatus); // CCD temperature
+        double tt;
+        unsigned int cc;
+
+        GetCCDTemperature(&tt,&cc);
+
+        TempNetPacket temp(tt,cc); // CCD temperature
+//        TempNetPacket temp(currentTemperature,currentCoolerStatus); // CCD temperature
+
         ok = temp.Send(socket,NetworkTimeout);
         if ( !ok ) {
             qDebug() << "ERROR OF CAMERA TEMPERATURE SENDING! " << "Packet error: " << temp.GetPacketError();
@@ -241,7 +280,6 @@ void Server::ClientConnection()
         socket->disconnectFromHost();
         return;
     }
-
 }
 
 
@@ -300,7 +338,7 @@ void Server::ExecuteCommand()
 
         if ( command_name == NETPROTOCOL_COMMAND_STOP ) {
 
-        } else if ( command_name == NETPROTOCOL_COMMAND_INIT ) {
+        } else if ( command_name == NETPROTOCOL_COMMAND_INIT ) { // re-init camera
             InitCamera();
             last_oper_status = (lastError == DRV_SUCCESS) ? Server::SERVER_ERROR_OK : lastError;
             server_status_packet.SetStatus(last_oper_status,"");

@@ -1,6 +1,6 @@
 #include "temppollingthread.h"
 
-#ifdef EMULATOR
+#ifdef EMULATOR_MODE
 #include<cmath>
 #endif
 
@@ -9,7 +9,7 @@ TempPollingThread::TempPollingThread(Camera *cam, unsigned long poll_int):
 {
     if ( polling_interval == 0 ) ++polling_interval;
 
-#ifdef EMULATOR
+#ifdef EMULATOR_MODE
     camera->currentTemperature = 20.0;
 #endif
 }
@@ -31,15 +31,15 @@ void TempPollingThread::stop()
 // The Camera::GetTemperature function is not used here to avoid massive logging (see Camera::GetTemperature implementation)
 void TempPollingThread::run()
 {
-    QMutexLocker lock(&camera->tempMutex); // lock mutex
-
     stop_thread = false;
 
     float temp;
     unsigned int cool;
 
     while ( !stop_thread ) {
-#ifdef EMULATOR
+        camera->tempMutex.lock();
+
+#ifdef EMULATOR_MODE
         temp = camera->currentTemperature;
 
         double diff = abs(temp - camera->tempSetPoint);
@@ -69,6 +69,8 @@ void TempPollingThread::run()
             camera->currentCoolerStatus  = cool;
             emit camera->CoolerStatusChanged(cool);
         }
+
+        camera->tempMutex.unlock();
 
         // wait for polling interval
         for ( unsigned int tick = 1; (tick <= polling_interval) && !stop_thread; ++tick) QThread::sleep(1);

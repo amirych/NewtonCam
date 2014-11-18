@@ -23,9 +23,6 @@
 
             /* Andor API wrapper macro definition */
 
-// current time point macro. It returns a char* string
-#define TIME_STAMP QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ").toUtf8().data()
-
 
 #define ANDOR_API_CALL(API_FUNC, ...) { \
     lastError = API_FUNC(__VA_ARGS__); \
@@ -82,9 +79,8 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     LogFile = &log_file;
 
     cameraStatus = CAMERA_STATUS_UNINITILIZED_TEXT;
-//    emit CameraStatus(cameraStatus);
-//    LogFile = nullptr;
 
+    LogOutput("Start camera:\n");
 }
 
 
@@ -113,7 +109,7 @@ Camera::~Camera()
 
     ANDOR_API_CALL(ShutDown,);
     LogOutput("",false);
-    LogOutput("Stop camera.");
+    LogOutput("Shutdown camera.");
 //    if ( LogFile != nullptr ) {
 //        *LogFile << TIME_STAMP << "Stop camera.\n";
 //    }
@@ -137,53 +133,19 @@ void Camera::InitCamera(QString init_path, long camera_index)
     cameraStatus = CAMERA_STATUS_INIT_TEXT;
     emit CameraStatus(cameraStatus);
 
-    // log header
-    if ( LogFile != nullptr ) {
-//        const char* sp[] = {"            "};
-        char *sp = "            ";
-        QString str1,str2;
-        *LogFile << "\n\n\n";
-        *LogFile << sp  << "***************************************************\n";
-        *LogFile << sp  << "*                                                 *\n";
-        *LogFile << sp  << "* NewtonCam: Andor Newton camera control software *\n";
-        *LogFile << sp  << "*                                                 *\n";
-        str1.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
-        str2.setNum(NEWTONCAM_PACKAGE_VERSION_MINOR);
-        str1 += "." + str2;
-        str2 = "* Version:                                        *\n";
-        str2.replace(11,str1.length(),str1);
-        *LogFile << sp  << str2.toUtf8().data();
-
-        lastError = GetVersionInfo(AT_SDKVersion,sdk_ver,100);
-        str1 = sdk_ver;
-        str2 = "* Andor SDK version:                              *\n";
-        str2.replace(21,str1.length(),str1);
-        *LogFile << sp  << str2.toUtf8().data();
-
-//        lastError = GetVersionInfo(AT_DeviceDriverVersion,sdk_ver,100);
-//        str1 = sdk_ver;
-//        str2 = "* Andor device driver version:                    *\n";
-//        str2.replace(31,str1.length(),str1);
-//        *LogFile << str2.toUtf8().data();
-
-        *LogFile << sp  << "*                                                 *\n";
-        *LogFile << sp  << "***************************************************\n";
-
-        *LogFile << "\n";
-
-        *LogFile << TIME_STAMP << "Starting camera ...\n\n" << std::flush;
-    }
+    LogOutput("",false);
+    LogOutput("   [CAMERA] Initializing camera ...");
 
     ANDOR_API_CALL(GetAvailableCameras,&no_cameras);
 #ifdef QT_DEBUG
     qDebug() << "CAMERA: Number of found cameras: " << no_cameras;
 #endif
 
-#ifdef EMULATOR
+#ifdef EMULATOR_MODE
 //    if ( LogFile != nullptr ) {
-//        *LogFile << TIME_STAMP << "EMULATOR: start emulation mode!\n";
+//        *LogFile << TIME_STAMP << "EMULATOR_MODE: start emulation mode!\n";
 //    }
-    LogOutput("EMULATOR: start emulation mode!");
+    LogOutput("   [CAMERA] EMULATOR_MODE: start emulation mode!");
 #else
     if ( !no_cameras || (lastError != DRV_SUCCESS) ) { // camera is not detected!
         LogOutput("   [CAMERA] Cannot detect any cameras!");
@@ -194,6 +156,7 @@ void Camera::InitCamera(QString init_path, long camera_index)
 //        }
     }
 
+    LogOutput("   [CAMERA] Initialization path: " + initPath);
     char* path = initPath.toUtf8().data();
     ANDOR_API_CALL(Initialize,path);
     std::this_thread::sleep_for(std::chrono::seconds(2)); // wait for init proccess finished
@@ -207,6 +170,7 @@ void Camera::InitCamera(QString init_path, long camera_index)
         tempPolling = new TempPollingThread(this,tempPollingInterval);
     } else {
         tempPolling->stop();
+        tempPolling->wait(2000);
     }
 
     tempPolling->start();
@@ -215,12 +179,13 @@ void Camera::InitCamera(QString init_path, long camera_index)
         statusPolling = new StatusPollingThread(this,statusPollingInterval);
     } else {
         statusPolling->stop();
+        statusPolling->wait(2000);
     }
 
     cameraStatus = CAMERA_STATUS_READY_TEXT;
     emit CameraStatus(cameraStatus);
 
-#ifdef EMULATOR
+#ifdef EMULATOR_MODE
     tempSetPoint = -30.0;
     currentExpTime = 0.0;
 #endif
@@ -229,7 +194,7 @@ void Camera::InitCamera(QString init_path, long camera_index)
 
 void Camera::InitCamera(long camera_index)
 {
-    InitCamera("",camera_index);
+    InitCamera(initPath,camera_index);
 }
 
 unsigned int Camera::GetLastError() const
@@ -263,10 +228,10 @@ void Camera::SetCoolerON()
 
 void Camera::SetCCDTemperature(const int temp)
 {
-#ifdef EMULATOR
+#ifdef EMULATOR_MODE
     if ( LogFile != nullptr ) {
         tempSetPoint = temp;
-        *LogFile << TIME_STAMP << "EMULATOR: Set CCD temperature: " << temp << " degrees\n";
+        *LogFile << TIME_STAMP << "EMULATOR_MODE: Set CCD temperature: " << temp << " degrees\n";
     }
 #else
     ANDOR_API_CALL(SetTemperature,temp);
@@ -278,7 +243,7 @@ void Camera::GetCCDTemperature(double *temp, unsigned int *cooler_stat)
 {
     QMutexLocker lock(&tempMutex);
 
-#ifdef EMULATOR
+#ifdef EMULATOR_MODE
     *temp = currentTemperature;
     *cooler_stat = currentCoolerStatus;
 #else
@@ -303,7 +268,7 @@ void Camera::GetCCDTemperature(double *temp, unsigned int *cooler_stat)
 
 void Camera::SetExpTime(const double exp_time)
 {
-#ifdef EMULATOR
+#ifdef EMULATOR_MODE
     currentExpTime = exp_time;
 #else
     ANDOR_API_CALL(SetExposureTime,exp_time);
@@ -314,7 +279,7 @@ void Camera::SetExpTime(const double exp_time)
 
 void Camera::StartExposure(const QString &fits_filename, const QString &hdr_filename)
 {
-#ifdef EMULATOR
+#ifdef EMULATOR_MODE
     currentStatus = DRV_ACQUIRING;
 #else
     ANDOR_API_CALL(StartAcquisition,);
@@ -381,3 +346,4 @@ void Camera::LogOutput(QStringList &log_strs)
 //    }
 //    *LogFile << std::endl << std::flush;
 //}
+

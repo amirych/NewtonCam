@@ -39,6 +39,10 @@
 #define CAMERA_DEFAULT_TEMP_POLLING_INT 10 // in seconds, default interval for CCD chip temperature polling
 #define CAMERA_DEFAULT_STATUS_POLLING_INT 100 // in milliseconds, default interval for Newton-camera status polling
 
+// current time point macro. It returns a char* string
+#define TIME_STAMP QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ").toUtf8().data()
+
+
 // forward definitions
 class TempPollingThread;
 class StatusPollingThread;
@@ -126,13 +130,13 @@ protected:
     void LogOutput(QString log_str, bool time_stamp = true, bool new_line = true);
     void LogOutput(QStringList &log_strs);
 
-#ifdef EMULATOR
+//#ifdef EMULATOR_MODE
     double tempSetPoint;
 
     unsigned int currentStatus;
 
     double currentExpTime;
-#endif
+//#endif
 };
 
 #endif // CAMERA_H

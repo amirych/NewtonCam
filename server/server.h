@@ -77,6 +77,8 @@ protected:
     int NetworkTimeout;
 
     NetPacketHandler *packetHandler;
+
+    QString serverVersionString;
 };
 
 #endif // SERVER_H

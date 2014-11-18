@@ -1,6 +1,7 @@
 #include "server.h"
 #include "servergui.h"
 #include "proto_defs.h"
+#include "../version.h"
 
 #include <QApplication>
 #include <QCommandLineOption>
@@ -163,7 +164,7 @@ int main(int argc, char *argv[])
             foreach (const QString &str, list) {
                 ok = rx.exactMatch(str);
                 if ( !ok ) { // skip IP-addresses and lookup only hostnames
-                    QHostInfo info = QHostInfo::fromName(str);
+                    QHostInfo info = QHostInfo::fromName(str.trimmed());
                     allowed_hosts.append(info.addresses());
                 } else allowed_hosts << QHostAddress(str);
             }
@@ -199,6 +200,8 @@ int main(int argc, char *argv[])
         LogFile = &std::cerr;
     } else if ( !cameraLogFilename.compare("STD::COUT",Qt::CaseInsensitive) ) {
         LogFile = &std::cout;
+    } else if ( !cameraLogFilename.compare("NULL",Qt::CaseInsensitive) ) { // no log messages
+        LogFile = nullptr;
     } else {
         log_file.open(cameraLogFilename.toUtf8().data(),std::ios_base::app);
         if ( !log_file.is_open() ) {
@@ -207,6 +210,35 @@ int main(int argc, char *argv[])
         } else {
             LogFile = &log_file;
         }
+    }
+
+    // log header
+    if ( LogFile != nullptr ) {
+        char *sp = "            ";
+        QString str1,str2;
+        *LogFile << "\n\n\n";
+        *LogFile << sp  << "***************************************************\n";
+        *LogFile << sp  << "*                                                 *\n";
+        *LogFile << sp  << "* NewtonCam: Andor Newton camera control software *\n";
+        *LogFile << sp  << "*                                                 *\n";
+        str1.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
+        str2.setNum(NEWTONCAM_PACKAGE_VERSION_MINOR);
+        str1 += "." + str2;
+        str2 = "* Version:                                        *\n";
+        str2.replace(11,str1.length(),str1);
+        *LogFile << sp  << str2.toUtf8().data();
+
+        char sdk_ver[100];
+        GetVersionInfo(AT_SDKVersion,sdk_ver,100);
+        str1 = sdk_ver;
+        str2 = "* Andor SDK version:                              *\n";
+        str2.replace(21,str1.length(),str1);
+        *LogFile << sp  << str2.toUtf8().data();
+
+        *LogFile << sp  << "*                                                 *\n";
+        *LogFile << sp  << "***************************************************\n";
+
+        *LogFile << "\n" << std::flush;
     }
 
     Server CamServer(*LogFile,allowed_hosts,server_port);
@@ -240,6 +272,12 @@ int main(int argc, char *argv[])
         app.processEvents();
     }
 
+    // init path handling
+    if ( cameraInitPath.isEmpty() || cameraInitPath.isNull() ) {
+        cameraInitPath = QCoreApplication::applicationDirPath();
+    }
+
+    CamServer.SetPollingIntervals(temp_poll_int,CAMERA_DEFAULT_STATUS_POLLING_INT);
     CamServer.InitCamera(cameraInitPath,0);
 
 //    if ( CamServer.getLastServerError() != Server::SERVER_ERROR_OK ) {

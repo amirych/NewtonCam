@@ -43,44 +43,16 @@ void NewtonGui::Connect(QHostAddress &server_addr, quint16 port)
 //        QMessageBox::StandardButton bt =
         QMessageBox::critical(serverGUI,"Error","Can not connect to NewtonCam server!");
         emit Error(NEWTONGUI_ERROR_CANNOT_CONNECT);
-
-//        serverGUI->TempChanged(-10.0003);
-
-//        serverGUI->CoolerStatusChanged(20034);
-
         return;
     }
-
-    str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
-
-    serverGUI->LogMessage("<b> " + str + ":</b> Connection is established!");
-    serverGUI->LogMessage("           ");
 
 
                 /*  hand-sake with server  */
 
     HelloNetPacket hello;
+    QString serverVersion,serverType;
 
-    hello.Receive(socket,NETPROTOCOL_TIMEOUT);
-    if ( !hello.isPacketValid() ) {
-        socket->disconnectFromHost();
-//        QMessageBox::StandardButton bt =
-        QMessageBox::critical(serverGUI,"Error","Network error!");
-        emit Error(NEWTONGUI_ERROR_NETWORK);
-        return;
-    }
-
-    QString serverVersion;
-    QString serverType = hello.GetSenderType(&serverVersion);
-
-    if ( serverType != NETPROTOCOL_SENDER_TYPE_SERVER ) {
-        socket->disconnectFromHost();
-//        QMessageBox::StandardButton bt =
-        QMessageBox::critical(serverGUI,"Error","It seems this is not NewtonCam server!");
-        emit Error(NEWTONGUI_ERROR_INVALID_SERVER);
-        return;
-    }
-
+    // form version string for GUI-client
     serverVersion.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
     serverType.setNum(NEWTONCAM_PACKAGE_VERSION_MINOR);
 
@@ -97,6 +69,36 @@ void NewtonGui::Connect(QHostAddress &server_addr, quint16 port)
         emit Error(NEWTONGUI_ERROR_NETWORK);
         return;
     }
+
+    // receive answer from server
+    hello.Receive(socket,NETPROTOCOL_TIMEOUT);
+    if ( !hello.isPacketValid() ) {
+        socket->disconnectFromHost();
+//        QMessageBox::StandardButton bt =
+        QMessageBox::critical(serverGUI,"Error","Network error!");
+        emit Error(NEWTONGUI_ERROR_NETWORK);
+        return;
+    }
+
+    serverType = hello.GetSenderType(&serverVersion);
+
+    if ( serverType != NETPROTOCOL_SENDER_TYPE_SERVER ) {
+        str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
+        serverGUI->LogMessage("<b> " + str + ":</b> Could not find a NewtonCam server!");
+        socket->disconnectFromHost();
+//        QMessageBox::StandardButton bt =
+        QMessageBox::critical(serverGUI,"Error","Could not find a NewtonCam server!");
+        emit Error(NEWTONGUI_ERROR_INVALID_SERVER);
+        return;
+    }
+
+
+    str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
+
+    serverGUI->LogMessage("<b> " + str + ":</b> Found NewtonCam server of version " + serverVersion + " ...");
+    serverGUI->LogMessage("<b> " + str + ":</b> Connection is established!");
+    serverGUI->LogMessage("           ");
+
 
     connect(socket,SIGNAL(disconnected()),this,SLOT(ServerDisconnected()));
 

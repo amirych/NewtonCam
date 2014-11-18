@@ -1,6 +1,7 @@
 #include "netpacket.h"
 #include "proto_defs.h"
 #include "../server/server.h"
+#include "../version.h"
 
 #include <QCoreApplication>
 #include <QTcpSocket>
@@ -209,6 +210,19 @@ int main(int argc, char *argv[])
     HelloNetPacket hello;
     StatusNetPacket server_status_packet;
     status_t status;
+    QString clientVersion, str;
+
+                /*  Send HELLO message  */
+
+    clientVersion.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
+    str.setNum(NEWTONCAM_PACKAGE_VERSION_MINOR);
+    clientVersion += "." + str;
+
+    hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_CLIENT,clientVersion);
+    ok = hello.Send(&socket,NETPROTOCOL_TIMEOUT);
+    if ( !ok ) {
+        return CLIENT_ERROR_CONNECTION;
+    }
 
                 /*   Receive HELLO message from server   */
 
@@ -226,14 +240,7 @@ int main(int argc, char *argv[])
     qDebug() << "Received HELLO from server: " << hello.GetSenderType();
 #endif
 
-                /*  Send HELLO message  */
-
-    hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_CLIENT,"");
-    ok = hello.Send(&socket,NETPROTOCOL_TIMEOUT);
-    if ( !ok ) {
-        return CLIENT_ERROR_CONNECTION;
-    }
-    SERVER_STATUS;
+//    SERVER_STATUS;
 
                 /*  Send commands to server  */
 
