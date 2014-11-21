@@ -70,7 +70,8 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     tempPollingInterval(CAMERA_DEFAULT_TEMP_POLLING_INT),
     statusPolling(nullptr),
     statusPollingInterval(CAMERA_DEFAULT_STATUS_POLLING_INT),
-    cameraStatus(CAMERA_STATUS_UNINITILIZED_TEXT)
+    cameraStatus(CAMERA_STATUS_UNINITILIZED_TEXT),
+    exp_timer(nullptr), currentExposureClock(0.0), currentExpTime(0.0)
 {
 #ifdef QT_DEBUG
     qDebug() << "Create Camera";
@@ -81,6 +82,13 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     cameraStatus = CAMERA_STATUS_UNINITILIZED_TEXT;
 
     LogOutput("Start camera:\n");
+
+    exp_timer = new QTimer(this);
+    connect(exp_timer,SIGNAL(timeout()),this,SLOT(ExposureCounter()));
+
+#ifdef EMULATOR_MODE
+    currentStatus = DRV_SUCCESS;
+#endif
 }
 
 
@@ -119,8 +127,23 @@ Camera::~Camera()
 
 void Camera::InitCamera(QString init_path, long camera_index)
 {
+    LogOutput("",false);
+    LogOutput("   [CAMERA] Initializing camera ...");
+
     initPath = init_path;
     Camera_Index = camera_index;
+
+    // if init while acquisition is in progress then abort it
+
+#ifdef EMULATOR_MODE
+    if ( currentStatus == DRV_ACQUIRING ) StopExposure();
+#else
+    int camera_status;
+    ANDOR_API_CALL(GetStatus,&camera_status)
+    if ( lastError != DRV_NOT_INITIALIZED ) {
+        if ( camera_status == DRV_ACQUIRING ) StopExposure();
+    }
+#endif
 
     lastError = DRV_SUCCESS;
 
@@ -132,9 +155,6 @@ void Camera::InitCamera(QString init_path, long camera_index)
 
     cameraStatus = CAMERA_STATUS_INIT_TEXT;
     emit CameraStatus(cameraStatus);
-
-    LogOutput("",false);
-    LogOutput("   [CAMERA] Initializing camera ...");
 
     ANDOR_API_CALL(GetAvailableCameras,&no_cameras);
 #ifdef QT_DEBUG
@@ -268,9 +288,9 @@ void Camera::GetCCDTemperature(double *temp, unsigned int *cooler_stat)
 
 void Camera::SetExpTime(const double exp_time)
 {
-#ifdef EMULATOR_MODE
     currentExpTime = exp_time;
-#else
+    StartExposure("","");
+#ifndef EMULATOR_MODE
     ANDOR_API_CALL(SetExposureTime,exp_time);
 #endif
 }
@@ -281,19 +301,30 @@ void Camera::StartExposure(const QString &fits_filename, const QString &hdr_file
 {
 #ifdef EMULATOR_MODE
     currentStatus = DRV_ACQUIRING;
+    lastError = DRV_SUCCESS;
 #else
     ANDOR_API_CALL(StartAcquisition,);
 #endif
     if ( lastError == DRV_SUCCESS ) {
         statusPolling->start();
     }
+    cameraStatus = CAMERA_STATUS_ACQUISITION_TEXT;
+    emit CameraStatus(cameraStatus);
+    exp_timer->start(CAMERA_TIMER_RESOLUTION*1000);
 }
 
 
 void Camera::StopExposure()
 {
+#ifdef EMULATOR_MODE
+    currentStatus = DRV_SUCCESS;
+#else
     ANDOR_API_CALL(AbortAcquisition,);
+#endif
+    exp_timer->stop();
     statusPolling->stop();
+    currentExposureClock = 0.0;
+    emit ExposureClock(currentExposureClock);
 }
 
 
@@ -319,6 +350,23 @@ void Camera::LogOutput(QStringList &log_strs)
         }
         LogOutput("",false);
     }
+}
+
+
+            /*  protected slots  */
+
+void Camera::ExposureCounter()
+{
+    currentExposureClock -= CAMERA_TIMER_RESOLUTION;
+    if ( currentExposureClock >= 0 ) { // protect aganist negative value
+        if ( currentExposureClock < CAMERA_TIMER_RESOLUTION ) currentExposureClock = 0.0;
+    } else  currentExposureClock = 0.0;
+    emit ExposureClock(currentExposureClock);
+    if ( currentExposureClock == 0.0 ) {
+        exp_timer->stop();
+        emit CameraStatus(CAMERA_STATUS_READING_TEXT);
+    }
+
 }
 
             /*  private methods  */

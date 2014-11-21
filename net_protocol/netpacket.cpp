@@ -1,6 +1,14 @@
 #include "netpacket.h"
 #include "proto_defs.h"
 
+#ifdef Q_OS_WIN
+    #include "../AndorSDK/atmcd32d.h"
+#endif
+
+#ifdef Q_OS_LINUX
+    #include "../AndorSDK/atmcdLXd.h"
+#endif
+
 #include<QTextStream>
 #include<QStringList>
 #include <iostream>
@@ -708,18 +716,26 @@ StatusNetPacket& StatusNetPacket::Receive(QTcpSocket *socket, int timeout)
 TempNetPacket::TempNetPacket(const double temp, const unsigned int cooling_status):
     NetPacket(NetPacket::PACKET_ID_TEMP), Temp(temp), CoollingStatus(cooling_status)
 {
-    QString str;
-    QTextStream st(&str);
-
-    st << Temp << NETPROTOCOL_CONTENT_DELIMETER << CoollingStatus;
-
-    SetContent(NetPacket::PACKET_ID_TEMP,str);
+    Init();
 }
 
 
 TempNetPacket::TempNetPacket(): TempNetPacket(0.0,0)
 {
 
+}
+
+
+void TempNetPacket::Init()
+{
+    QString str;
+    QTextStream st(&str);
+
+    st << Temp << NETPROTOCOL_CONTENT_DELIMETER << CoollingStatus;
+
+    st.flush();
+
+    SetContent(NetPacket::PACKET_ID_TEMP,str);
 }
 
 
@@ -743,6 +759,7 @@ void TempNetPacket::SetTemp(const double temp, const unsigned int cooling_status
 {
     Temp = temp;
     CoollingStatus = cooling_status;
+    Init();
 }
 
 
@@ -918,6 +935,132 @@ HelloNetPacket& HelloNetPacket::Receive(QTcpSocket *socket, int timeout)
     if ( !ValidPacket ) return *this;
 
     if ( ID != NetPacket::PACKET_ID_HELLO ) {
+        ValidPacket = false;
+        packetError = NetPacket::PACKET_ERROR_ID_MISMATCH;
+        return *this;
+    }
+
+    ParseContent();
+
+    return *this;
+}
+
+
+            /***************************************
+            *                                      *
+            *   GuiNetPacket class implementation  *
+            *                                      *
+            ***************************************/
+
+GuiNetPacket::GuiNetPacket(const unsigned int camera_err, const double temp, const unsigned int cooler_status,
+                           const double exp_clock, const QString &camera_status):
+    NetPacket(NetPacket::PACKET_ID_GUI),
+    cameraError(camera_err), ccdTemp(temp), coolerStatus(cooler_status),
+    cameraStatus(camera_status), exposureClock(exp_clock)
+{
+    Init();
+}
+
+
+GuiNetPacket::GuiNetPacket(): GuiNetPacket(DRV_SUCCESS, 0.0, DRV_TEMP_OFF, 0.0, QString(""))
+{
+
+}
+
+
+void GuiNetPacket::Init()
+{
+    QString str;
+    QTextStream st(&str);
+
+    st << cameraError << NETPROTOCOL_CONTENT_DELIMETER << ccdTemp << NETPROTOCOL_CONTENT_DELIMETER <<
+          coolerStatus << NETPROTOCOL_CONTENT_DELIMETER << exposureClock << NETPROTOCOL_CONTENT_DELIMETER <<
+          cameraStatus;
+
+    st.flush();
+
+    SetContent(NetPacket::PACKET_ID_GUI,str);
+}
+
+
+void GuiNetPacket::SetParams(const unsigned int camera_err, const double temp, const unsigned int cooler_status,
+                             const double exp_clock, const QString &camera_status)
+{
+    cameraError = camera_err;
+    ccdTemp = temp;
+    coolerStatus = cooler_status;
+    cameraStatus = camera_status;
+    exposureClock = exp_clock;
+
+    Init();
+}
+
+
+void GuiNetPacket::GetParams(unsigned int *camera_err, double *temp, unsigned int *cooler_status,
+                             double *exp_clock, QString *camera_status)
+{
+    *camera_err = cameraError;
+    *temp = ccdTemp;
+    *cooler_status = coolerStatus;
+    *camera_status = cameraStatus;
+    *exp_clock = exposureClock;
+}
+
+
+void GuiNetPacket::ParseContent()
+{
+    QStringList vals = Content.split(NETPROTOCOL_CONTENT_DELIMETER, QString::SkipEmptyParts);
+
+    ValidPacket = false;
+
+    if ( vals.empty() || (vals.length() < 5) ) {
+        packetError = NetPacket::PACKET_ERROR_UNKNOWN_PROTOCOL;
+        return;
+    }
+
+    if ( vals.length() > 5 ) {
+        for ( int i = 5; i < vals.length(); ++i ) vals[4] += QString(NETPROTOCOL_CONTENT_DELIMETER) + vals[i];
+    }
+
+    bool ok;
+
+    cameraError = vals[0].toUInt(&ok);
+    if ( !ok ) {
+        packetError = NetPacketError::PACKET_ERROR_BAD_NUMERIC;
+        return;
+    }
+
+    ccdTemp = vals[1].toDouble(&ok);
+    if ( !ok ) {
+        packetError = NetPacketError::PACKET_ERROR_BAD_NUMERIC;
+        return;
+    }
+
+    coolerStatus = vals[2].toUInt(&ok);
+    if ( !ok ) {
+        packetError = NetPacketError::PACKET_ERROR_BAD_NUMERIC;
+        return;
+    }
+
+    exposureClock = vals[3].toDouble(&ok);
+    if ( !ok ) {
+        packetError = NetPacketError::PACKET_ERROR_BAD_NUMERIC;
+        return;
+    }
+
+    cameraStatus = vals[4];
+
+    ValidPacket = true;
+}
+
+
+GuiNetPacket& GuiNetPacket::Receive(QTcpSocket *socket, int timeout)
+{
+    NetPacket::Receive(socket, timeout);
+
+    if ( !ValidPacket ) return *this;
+
+    if ( ID != NetPacket::PACKET_ID_GUI ) {
         ValidPacket = false;
         packetError = NetPacket::PACKET_ERROR_ID_MISMATCH;
         return *this;

@@ -22,7 +22,7 @@ class NET_PROTOCOLSHARED_EXPORT NetPacket
 public:
 
     enum NetPacketID {PACKET_ID_INFO, PACKET_ID_CMD, PACKET_ID_TEMP,
-                      PACKET_ID_STATUS, PACKET_ID_HELLO, PACKET_ID_UNKNOWN};
+                      PACKET_ID_STATUS, PACKET_ID_HELLO, PACKET_ID_GUI, PACKET_ID_UNKNOWN};
     enum NetPacketError {PACKET_ERROR_OK, PACKET_ERROR_NETWORK, PACKET_ERROR_NO_SOCKET,
                          PACKET_ERROR_UNKNOWN_PROTOCOL, PACKET_ERROR_CONTENT_LEN,
                          PACKET_ERROR_BAD_NUMERIC, PACKET_ERROR_WAIT, PACKET_ERROR_ID_MISMATCH};
@@ -177,6 +177,7 @@ private:
     double Temp; // temperature
     unsigned int CoollingStatus;
 
+    void Init();
     void ParseContent();
 };
 
@@ -205,6 +206,35 @@ private:
     QString SenderType;
     QString SenderVersion;
 
+    void ParseContent();
+};
+
+
+class NET_PROTOCOLSHARED_EXPORT GuiNetPacket: public NetPacket
+{
+public:
+    explicit GuiNetPacket();
+    GuiNetPacket(const unsigned int camera_err, const double temp,
+                 const unsigned int cooler_status,
+                 const double exp_clock, const QString &camera_status);
+
+    void SetParams(const unsigned int camera_err, const double temp,
+                   const unsigned int cooler_status,
+                   const double exp_clock, const QString &camera_status);
+
+    void GetParams(unsigned int *camera_err, double *temp,
+                   unsigned int *cooler_status,
+                   double *exp_clock, QString *camera_status);
+
+    GuiNetPacket& Receive(QTcpSocket *socket, int timeout);
+private:
+    unsigned int cameraError;
+    unsigned int coolerStatus;
+    double ccdTemp;
+    QString cameraStatus;
+    double exposureClock;
+
+    void Init();
     void ParseContent();
 };
 

@@ -3,6 +3,15 @@
 #include "../server/server.h"
 #include "../version.h"
 
+#ifdef Q_OS_WIN
+    #include "../AndorSDK/atmcd32d.h"
+#endif
+
+#ifdef Q_OS_LINUX
+    #include "../AndorSDK/atmcdLXd.h"
+#endif
+
+
 #include <QCoreApplication>
 #include <QTcpSocket>
 #include <QString>
@@ -206,6 +215,7 @@ int main(int argc, char *argv[])
 
     QObject::connect(&socket,&QTcpSocket::disconnected,[=](){exit(CLIENT_ERROR_CONNECTION);});
 
+                /*   Hand-shaking    */
 
     HelloNetPacket hello;
     StatusNetPacket server_status_packet;
@@ -240,15 +250,19 @@ int main(int argc, char *argv[])
     qDebug() << "Received HELLO from server: " << hello.GetSenderType();
 #endif
 
-//    SERVER_STATUS;
+    // receive server answer ... It may be BUSY or OK
+    SERVER_STATUS;
 
                 /*  Send commands to server  */
 
     CmdNetPacket command_packet;
+    QString info_str;
+    QTextStream info_stream(&info_str);
 
     // --stop
 
     if ( cmdline_parser.isSet(stopOption) ) {
+        info_stream << NETPROTOCOL_COMMAND_STOP << " ";
         command_packet.SetCommand(NETPROTOCOL_COMMAND_STOP,"");
         SEND_COMMAND;
         SERVER_STATUS;
@@ -257,6 +271,7 @@ int main(int argc, char *argv[])
 
     // --init
     if ( cmdline_parser.isSet(initOption) ) {
+        info_stream << NETPROTOCOL_COMMAND_INIT << " ";
         command_packet.SetCommand(NETPROTOCOL_COMMAND_INIT,"");
         SEND_COMMAND;
         SERVER_STATUS;
@@ -265,6 +280,7 @@ int main(int argc, char *argv[])
     // --gettemp, it is a special command! The program receives a CCD temperature and exit!
 
     if ( cmdline_parser.isSet(gettempOption)) {
+        info_stream << NETPROTOCOL_COMMAND_GETTEMP << " ";
         command_packet.SetCommand(NETPROTOCOL_COMMAND_GETTEMP,"");
         SEND_COMMAND;
         TempNetPacket pk;
@@ -277,10 +293,43 @@ int main(int argc, char *argv[])
 
         unsigned int cooling_status;
         ccd_temp = pk.GetTemp(&cooling_status);
-        std::cout << ccd_temp << " " << cooling_status;
 
-        socket.disconnectFromHost();
-        return status;
+        QString cooling_status_str = "[]";
+
+        switch (cooling_status) {
+        case DRV_ACQUIRING: {
+            cooling_status_str.insert(1,"ACQUIRING");
+            break;
+        }
+        case DRV_TEMP_OFF: {
+            cooling_status_str.insert(1,"OFF");
+            break;
+        }
+        case DRV_TEMP_STABILIZED: {
+            cooling_status_str.insert(1,"STABILIZED");
+            break;
+        }
+        case DRV_TEMP_NOT_REACHED: {
+            cooling_status_str.insert(1,"NOT REACHED");
+            break;
+        }
+        case DRV_TEMP_DRIFT: {
+            cooling_status_str.insert(1,"DRIFT");
+            break;
+        }
+        case DRV_TEMP_NOT_STABILIZED: {
+            cooling_status_str.insert(1,"NOT STABILIZED");
+            break;
+        }
+        default:
+            break;
+        }
+
+        std::cout << ccd_temp << " " << cooling_status_str.toUtf8().data() << std::endl;
+
+//        socket.disconnect();
+//        socket.disconnectFromHost();
+//        return status;
     }
 
 
@@ -289,6 +338,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(binOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_BINNING,bin_vals);
+        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -297,6 +347,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(rateOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_RATE,cmdline_parser.value(rateOption));
+        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -306,6 +357,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(gainOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_GAIN,cmdline_parser.value(gainOption));
+        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -315,6 +367,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(roiOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_ROI,roi_vals);
+        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -324,6 +377,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(expOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_EXPTIME,exp_time);
+        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -332,6 +386,7 @@ int main(int argc, char *argv[])
     // --shutter (-s)
 
     command_packet.SetCommand(NETPROTOCOL_COMMAND_SHUTTER, shutter_state == 0 ? 0.0 : 1.0);
+    info_stream << command_packet.GetPacketContent() << " ";
     SEND_COMMAND;
     SERVER_STATUS;
 
@@ -340,6 +395,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(tempOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_SETTEMP,ccd_temp);
+        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -352,29 +408,37 @@ int main(int argc, char *argv[])
     if ( !pos_args.isEmpty() ) {
         // result FITS-file name
         command_packet.SetCommand(NETPROTOCOL_COMMAND_FITSFILE,pos_args[0]);
+        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
 
         // user FITS-header file
         if ( pos_args.length() > 1 ) {
             command_packet.SetCommand(NETPROTOCOL_COMMAND_HEADFILE,pos_args[1]);
+            info_stream << command_packet.GetPacketContent() << " ";
             SEND_COMMAND;
             SERVER_STATUS;
         }
     }
 
+
+    info_stream.flush();
+
+    InfoNetPacket info_pk(info_str);
+    ok = info_pk.Send(&socket);
+    if ( !ok ) {
+        return CLIENT_ERROR_CONNECTION;
+    }
+
+    SERVER_STATUS;
+
+    socket.disconnect(); // disconnect all slots
+
 #ifdef QT_DEBUG
     qDebug() << "Disconnect from server";
 #endif
 
-
-    InfoNetPacket ii("command-line from client");
-    ii.Send(&socket);
-    server_status_packet.Receive(&socket);
-
-    socket.disconnect(); // disconnect all slots
-
-    socket.disconnectFromHost();
+//    socket.disconnectFromHost();
 
     return CLIENT_ERROR_OK;
 }

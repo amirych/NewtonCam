@@ -10,6 +10,7 @@
 #include <QString>
 #include <QDebug>
 #include <QMutex>
+#include <QTimer>
 
 #ifdef Q_OS_WIN
     #include "../AndorSDK/atmcd32d.h"
@@ -27,10 +28,11 @@
             *                                         *
             ******************************************/
 
-#define CAMERA_STATUS_UNINITILIZED_TEXT "Uninitialized"
+#define CAMERA_STATUS_UNINITILIZED_TEXT "<font color=red>Uninitialized</font>"
 #define CAMERA_STATUS_INIT_TEXT         "Init ..."
 #define CAMERA_STATUS_READY_TEXT        "Ready"
 #define CAMERA_STATUS_ACQUISITION_TEXT  "Acquisition ..."
+#define CAMERA_STATUS_ABORT_TEXT        "<font color=red>Abort!</font>"
 #define CAMERA_STATUS_READING_TEXT      "Reading Image ..."
 #define CAMERA_STATUS_SAVING_TEXT       "Saving Image ..."
 #define CAMERA_STATUS_FAILURE_TEXT      "Failure"
@@ -38,6 +40,9 @@
 
 #define CAMERA_DEFAULT_TEMP_POLLING_INT 10 // in seconds, default interval for CCD chip temperature polling
 #define CAMERA_DEFAULT_STATUS_POLLING_INT 100 // in milliseconds, default interval for Newton-camera status polling
+
+
+#define CAMERA_TIMER_RESOLUTION 1.0 // resolution of the camera exposure timer (in seconds)
 
 // current time point macro. It returns a char* string
 #define TIME_STAMP QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ").toUtf8().data()
@@ -102,11 +107,14 @@ signals:
     void CameraError(unsigned int err_code);
     void TemperatureChanged(double temp);
     void CoolerStatusChanged(unsigned int status);
-    void ExposureCounter(double counter);
+    void ExposureClock(double clock);
 
 public slots:
     void StartExposure(const QString &fits_filename, const QString &hdr_filename = "");
     void StopExposure();
+
+protected slots:
+    void ExposureCounter();
 
 protected:
     long Camera_Index;
@@ -126,6 +134,10 @@ protected:
     QString cameraStatus;
 
     QString initPath;
+
+    QTimer *exp_timer;
+
+    double currentExposureClock;
 
     void LogOutput(QString log_str, bool time_stamp = true, bool new_line = true);
     void LogOutput(QStringList &log_strs);

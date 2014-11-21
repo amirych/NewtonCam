@@ -25,6 +25,11 @@ void StatusPollingThread::run()
 {
     stop_thread = false;
 
+#ifdef EMULATOR_MODE
+    while ( (camera->currentExposureClock > 0.0) && !stop_thread ) {
+        QThread::msleep(polling_interval);
+    }
+#else
     ret_status = GetStatus(&camera_status);
     if ( ret_status != DRV_SUCCESS ) exit(ret_status);
 
@@ -33,4 +38,5 @@ void StatusPollingThread::run()
         if ( ret_status != DRV_SUCCESS ) exit(ret_status);
         QThread::msleep(polling_interval);
     }
+#endif
 }

@@ -79,6 +79,8 @@ protected:
     NetPacketHandler *packetHandler;
 
     QString serverVersionString;
+
+    bool newClientConnection;
 };
 
 #endif // SERVER_H

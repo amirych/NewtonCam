@@ -37,7 +37,7 @@ Server::Server(std::ostream &log_file, QList<QHostAddress> &hosts, quint16 port,
     serverPort(port), allowed_hosts(hosts),
     lastSocketError(QAbstractSocket::UnknownSocketError),
     NetworkTimeout(NETPROTOCOL_TIMEOUT), packetHandler(nullptr),
-    serverVersionString(QString(""))
+    serverVersionString(QString("")), newClientConnection(true)
 {
 #ifdef QT_DEBUG
     qDebug() << "Start server";
@@ -135,7 +135,7 @@ QAbstractSocket::SocketError Server::getLastSocketError() const
 #define SEND_STATUS(sk) { \
     ok = server_status_packet.Send(sk,NetworkTimeout); \
     if ( !ok ) { \
-        qDebug() << "ERROR OF SERVER STATUS SENDING! " << "Packet error: " << server_status_packet.GetPacketError(); \
+        qDebug() << "ERROR OF SERVER STATUS SENDING! " << "Packet error: " << server_status_packet.GetPacketError() << "; err = " << sk->errorString(); \
         lastSocketError = sk->error(); \
         emit ServerSocketError(lastSocketError); \
         sk->disconnectFromHost(); \
@@ -167,11 +167,27 @@ void Server::ClientConnection()
     QString senderVersion;
     QString senderType = hello.GetSenderType(&senderVersion);
 
+    // send server HELLO message
+
+    hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_SERVER,serverVersionString);
+    ok = hello.Send(socket,NetworkTimeout);
+    if ( !ok ) {
+        lastSocketError = socket->error();
+        emit ServerSocketError(lastSocketError);
+        socket->disconnectFromHost();
+        return;
+    }
+
+#ifdef QT_DEBUG
+    qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
+#endif
+
     QString hello_msg;
     server_status_packet.SetStatus(SERVER_ERROR_OK,"OK");
 
     if ( senderType == NETPROTOCOL_SENDER_TYPE_CLIENT ) {
-        if ( clientSocket != nullptr ) { // client already connected
+//        if ( clientSocket != nullptr ) { // client already connected
+        if ( !newClientConnection ) { // client already connected
             server_status_packet.SetStatus(SERVER_ERROR_BUSY,"Server is busy");
 
 #ifdef QT_DEBUG
@@ -198,20 +214,6 @@ void Server::ClientConnection()
             return;
         }
 
-        // send server HELLO message
-
-        hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_SERVER,serverVersionString);
-        ok = hello.Send(socket,NetworkTimeout);
-        if ( !ok ) {
-            lastSocketError = socket->error();
-            emit ServerSocketError(lastSocketError);
-            socket->disconnectFromHost();
-            return;
-        }
-
-#ifdef QT_DEBUG
-        qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
-#endif
 
         hello_msg = "<b>";
         hello_msg += TIME_STAMP;
@@ -219,8 +221,9 @@ void Server::ClientConnection()
         hello_msg += "New NEWTON CLIENT connection from " + client_address.toString();
         emit HelloIsReceived(hello_msg);
 
-//        SEND_STATUS(socket);
+        SEND_STATUS(socket);
 
+        newClientConnection = false;
         clientSocket = socket;
 
         packetHandler->SetSocket(clientSocket);
@@ -230,21 +233,6 @@ void Server::ClientConnection()
         connect(clientSocket,SIGNAL(readyRead()),packetHandler,SLOT(ReadDataStream()));
 
     } else if ( senderType == NETPROTOCOL_SENDER_TYPE_GUI ) {
-        // send server HELLO message
-
-        hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_SERVER,serverVersionString);
-        ok = hello.Send(socket,NetworkTimeout);
-        if ( !ok ) {
-            lastSocketError = socket->error();
-            emit ServerSocketError(lastSocketError);
-            socket->disconnectFromHost();
-            return;
-        }
-
-#ifdef QT_DEBUG
-        qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
-#endif
-
         guiSocket << socket;
         connect(socket,SIGNAL(disconnected()),this,SLOT(GUIDisconnected()));
 
@@ -293,7 +281,8 @@ void Server::ClientDisconnected()
     clientSocket->disconnect(packetHandler,SLOT(ReadDataStream()));
     packetHandler->Reset();
 
-    clientSocket = nullptr;
+//    clientSocket = nullptr;
+    newClientConnection = true;
 }
 
 
@@ -312,6 +301,7 @@ void Server::ExecuteCommand()
     switch ( clientPacket->GetPacketID() ) {
     case NetPacket::PACKET_ID_INFO: {
         InfoNetPacket *pk = static_cast<InfoNetPacket*>(clientPacket);
+        emit InfoIsReceived(pk->GetInfo());
 
 #ifdef QT_DEBUG
         qDebug() << "SERVER: INFO-packet has been recieved [" << pk->GetInfo() << "]";
@@ -337,13 +327,14 @@ void Server::ExecuteCommand()
         QString command_name = pk->GetCmdName();
 
         if ( command_name == NETPROTOCOL_COMMAND_STOP ) {
-
+            StopExposure();
+            return;
         } else if ( command_name == NETPROTOCOL_COMMAND_INIT ) { // re-init camera
             InitCamera();
             last_oper_status = (lastError == DRV_SUCCESS) ? Server::SERVER_ERROR_OK : lastError;
             server_status_packet.SetStatus(last_oper_status,"");
             SEND_STATUS(clientSocket);
-            return;
+//            return;
         } else if ( command_name == NETPROTOCOL_COMMAND_BINNING ) {
             QVector<double> bin_vals;
             QVector<int> bin_vals_int;
@@ -383,14 +374,36 @@ void Server::ExecuteCommand()
             if ( !ok ) {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
                 SEND_STATUS(clientSocket);
+                return;
             }
-
         } else if ( command_name == NETPROTOCOL_COMMAND_EXPTIME ) {
-
+            ok = pk->GetCmdArgs(&currentExposureClock);
+            if ( !ok ) {
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+                SEND_STATUS(clientSocket);
+            }
+            SetExpTime(currentExposureClock);
         } else if ( command_name == NETPROTOCOL_COMMAND_SETTEMP ) {
 
         } else if ( command_name == NETPROTOCOL_COMMAND_GETTEMP ) {
-
+            double temp;
+            unsigned int cool_stat;
+            GetCCDTemperature(&temp,&cool_stat);
+            TempNetPacket pk;
+            pk.SetTemp(temp,cool_stat);
+#ifdef QT_DEBUG
+            qDebug() << "SERVER: send temp. packet: " << pk.GetByteView();
+            qDebug() << "SERVER: temp: " << temp << ", cool: " << cool_stat;
+#endif
+            ok = pk.Send(clientSocket);
+            if ( !ok ) {
+                lastSocketError = clientSocket->error();
+                emit ServerSocketError(lastSocketError);
+                clientSocket->disconnectFromHost();
+                return;
+            }
+//            server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"");
+//            SEND_STATUS(clientSocket);
         } else if ( command_name == NETPROTOCOL_COMMAND_FITSFILE ) {
 
         } else if ( command_name == NETPROTOCOL_COMMAND_HEADFILE ) {
@@ -402,6 +415,7 @@ void Server::ExecuteCommand()
             return;
         }
 
+        // command was executed, send its exit status
         server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
 #ifdef QT_DEBUG
         qDebug() << "SERVER: sending status [" << server_status_packet.GetByteView();

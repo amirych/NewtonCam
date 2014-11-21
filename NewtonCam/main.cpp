@@ -269,6 +269,7 @@ int main(int argc, char *argv[])
         QObject::connect(&CamServer,SIGNAL(CameraError(unsigned int)),serverGUI,SLOT(ServerError(uint)));
         QObject::connect(&CamServer,SIGNAL(ServerSocketError(QAbstractSocket::SocketError)),
                          serverGUI,SLOT(NetworkError(QAbstractSocket::SocketError)));
+        QObject::connect(&CamServer,SIGNAL(ExposureClock(double)),serverGUI,SLOT(ExposureProgress(double)));
         app.processEvents();
     }
 
