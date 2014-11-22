@@ -150,6 +150,21 @@ void NewtonGui::ServerMsgIsReceived()
             serverGUI->CoolerStatusChanged(cstatus);
             break;
         }
+        case NetPacket::PACKET_ID_GUI: {
+            GuiNetPacket *gui_pk = static_cast<GuiNetPacket*>(pk);
+            double temp, exp_clock;
+            unsigned int cam_err, cool_status;
+            QString cam_state;
+
+            gui_pk->GetParams(&cam_err,&temp,&cool_status,&exp_clock,&cam_state);
+
+            serverGUI->TempChanged(temp);
+            serverGUI->CoolerStatusChanged(cool_status);
+            serverGUI->ServerError(cam_err);
+            serverGUI->ServerStatus(cam_state);
+            serverGUI->ExposureProgress(exp_clock);
+            break;
+        }
         default: // still just ignoring other types of packet
             break;
     }

@@ -364,7 +364,8 @@ void Camera::ExposureCounter()
     emit ExposureClock(currentExposureClock);
     if ( currentExposureClock == 0.0 ) {
         exp_timer->stop();
-        emit CameraStatus(CAMERA_STATUS_READING_TEXT);
+        cameraStatus = CAMERA_STATUS_READING_TEXT;
+        emit CameraStatus(cameraStatus);
     }
 
 }

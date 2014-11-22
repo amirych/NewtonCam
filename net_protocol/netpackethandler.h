@@ -9,6 +9,7 @@
 #include <QtNetwork/QTcpSocket>
 #include <QList>
 #include <QString>
+#include <QThread>
 
 class NET_PROTOCOLSHARED_EXPORT NetPacketHandler : public QObject
 {
@@ -26,13 +27,16 @@ public:
 
     void SetSocket(QTcpSocket *socket);
 
-    bool SendPacket(NetPacket *packet, int timeout = NETPROTOCOL_TIMEOUT);
-    bool SendPacket(QList<QTcpSocket*> *queue, NetPacket* packet, int timeout = NETPROTOCOL_TIMEOUT);
+//    bool SendPacket(NetPacket *packet, int timeout = NETPROTOCOL_TIMEOUT);
+//    bool SendPacket(QList<QTcpSocket*> *queue, NetPacket* packet, int timeout = NETPROTOCOL_TIMEOUT);
 
+    void AddSocket(QTcpSocket *socket); // add socket to send queue
 
     NetPacket* GetPacket(); // extract first received packet from a queue and return it to caller
 
     NetPacketHandlerError GetLastError() const;
+
+    void SetNetworkTimeout(const int timeout);
 
     void Reset();
 
@@ -43,16 +47,22 @@ signals:
 
 public slots:
     void ReadDataStream();
+    void SendPacket(NetPacket *packet);
+
+private slots:
+    void SocketDisconnected();
 
 private:
     QTcpSocket *current_socket;
 
 //    QList<NetPacket*> packet_queue;
 
-//    QList<NetPacket*> send_queue;
+    QList<QTcpSocket*> send_socket_queue;
     QList<NetPacket*> receive_queue;
 
     NetPacketHandlerError lastError;
+
+    int networkTimeout;
 
     // current recieved packet fields
     NetPacket *packet;

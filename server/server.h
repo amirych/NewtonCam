@@ -56,12 +56,14 @@ signals:
     void HelloIsReceived(QString hello);
     void InfoIsReceived(QString info);
     void ServerLogMessage(QString msg);
+    void UpdateRemoteGui(NetPacket *packet);
 
 protected slots:
     void ClientConnection();
     void ClientDisconnected();
     void ExecuteCommand();
     void GUIDisconnected();
+    void SendServerState();
 
 protected:
     QTcpServer *net_server;
@@ -81,6 +83,11 @@ protected:
     QString serverVersionString;
 
     bool newClientConnection;
+
+    GuiNetPacket currentStatePacket;
+
+    QThread packetHandlerThread;
+
 };
 
 #endif // SERVER_H

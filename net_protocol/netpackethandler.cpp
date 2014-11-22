@@ -4,8 +4,9 @@
                 /*  Constructors and destructor  */
 
 NetPacketHandler::NetPacketHandler(QTcpSocket *socket, QObject *parent):
-    QObject(parent), current_socket(socket), receive_queue(QList<NetPacket*>()),
-    lastError(PACKET_ERROR_OK), newPacket(true)
+    QObject(parent), current_socket(socket),
+    send_socket_queue(QList<QTcpSocket*>()), receive_queue(QList<NetPacket*>()),
+    lastError(PACKET_ERROR_OK), newPacket(true), networkTimeout(NETPROTOCOL_TIMEOUT)
 {
     packet = new NetPacket();
 }
@@ -38,6 +39,19 @@ void NetPacketHandler::SetSocket(QTcpSocket *socket)
 }
 
 
+void NetPacketHandler::AddSocket(QTcpSocket *socket)
+{
+    send_socket_queue << socket;
+    connect(socket,SIGNAL(disconnected()),this,SLOT(SocketDisconnected()));
+}
+
+
+void NetPacketHandler::SetNetworkTimeout(const int timeout)
+{
+    networkTimeout = timeout;
+}
+
+
 NetPacket* NetPacketHandler::GetPacket()
 {
     if ( receive_queue.isEmpty() ) {
@@ -50,29 +64,29 @@ NetPacket* NetPacketHandler::GetPacket()
 }
 
 
-bool NetPacketHandler::SendPacket(NetPacket *packet, int timeout)
-{
-    if ( current_socket == nullptr ) {
-        lastError = NetPacketHandler::PACKET_ERROR_NO_SOCKET;
-        return false;
-    }
+//bool NetPacketHandler::SendPacket(NetPacket *packet, int timeout)
+//{
+//    if ( current_socket == nullptr ) {
+//        lastError = NetPacketHandler::PACKET_ERROR_NO_SOCKET;
+//        return false;
+//    }
 
-    return packet->Send(current_socket, timeout);
-}
+//    return packet->Send(current_socket, timeout);
+//}
 
 
-bool NetPacketHandler::SendPacket(QList<QTcpSocket *> *queue, NetPacket *packet, int timeout)
-{
-    if ( queue == nullptr ) return true;
-    if ( queue->isEmpty() ) return true;
+//bool NetPacketHandler::SendPacket(QList<QTcpSocket *> *queue, NetPacket *packet, int timeout)
+//{
+//    if ( queue == nullptr ) return true;
+//    if ( queue->isEmpty() ) return true;
 
-    foreach (QTcpSocket* socket, *queue) {
-        bool ok = packet->Send(socket,timeout);
-        if ( !ok ) return ok;
-    }
+//    foreach (QTcpSocket* socket, *queue) {
+//        bool ok = packet->Send(socket,timeout);
+//        if ( !ok ) return ok;
+//    }
 
-    return true;
-}
+//    return true;
+//}
 
 
 NetPacketHandler::NetPacketHandlerError NetPacketHandler::GetLastError() const
@@ -127,9 +141,18 @@ void NetPacketHandler::ReadDataStream()
         receive_queue << pk;
         break;
     }
+    case GuiNetPacket::PACKET_ID_GUI: {
+        GuiNetPacket *pk = new GuiNetPacket(*packet);
+        receive_queue << pk;
+        break;
+    }
     default:
         break;
     }
+
+#ifdef QT_DEBUG
+    qDebug() << "PACKETHANDLER: received " << packet->GetByteView();
+#endif
 
     packet = new NetPacket();
     newPacket = true;
@@ -142,7 +165,41 @@ void NetPacketHandler::ReadDataStream()
 }
 
 
+void NetPacketHandler::SendPacket(NetPacket *packet)
+{
+    if ( send_socket_queue.isEmpty() ) return;
 
+#ifdef QT_DEBUG
+    qDebug() << "PACKETHANDLER: sending: " << packet->GetByteView();
+#endif
+
+    foreach (QTcpSocket* socket, send_socket_queue) {
+        bool ok = packet->Send(socket,networkTimeout);
+//        if ( !ok ) return;
+    }
+}
+
+                /*  Private slots   */
+
+void NetPacketHandler::SocketDisconnected()
+{
+    QObject* sender = QObject::sender();
+
+    if ( sender != nullptr ) {
+        int i = 0;
+        foreach (QTcpSocket* sk, send_socket_queue) {
+            if ( sk == sender ) {
+                sk->disconnect();
+#ifdef QT_DEBUG
+                qDebug() << "PACKETHANDLER: socket " << sk << " disconnected";
+#endif
+                send_socket_queue.removeAt(i);
+                return;
+            }
+            ++i;
+        }
+    }
+}
                 /*  Private methods  */
 
 void NetPacketHandler::SplitContent(QString &left, QString &right)

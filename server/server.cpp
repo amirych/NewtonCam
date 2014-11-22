@@ -68,11 +68,23 @@ Server::Server(std::ostream &log_file, QList<QHostAddress> &hosts, quint16 port,
         return;
     }
 
-    packetHandler = new NetPacketHandler(this);
+//    packetHandler = new NetPacketHandler(this);
+    packetHandler = new NetPacketHandler;
+    packetHandler->moveToThread(&packetHandlerThread);
 
     connect(net_server,SIGNAL(newConnection()),this,SLOT(ClientConnection()));
 
     connect(packetHandler,SIGNAL(PacketIsReceived()),this,SLOT(ExecuteCommand()));
+
+    connect(this,SIGNAL(UpdateRemoteGui(NetPacket*)),packetHandler,SLOT(SendPacket(NetPacket*)));
+
+    packetHandlerThread.start();
+
+    connect(this,SIGNAL(ExposureClock(double)),this,SLOT(SendServerState()));
+    connect(this,SIGNAL(TemperatureChanged(double)),this,SLOT(SendServerState()));
+    connect(this,SIGNAL(CoolerStatusChanged(uint)),this,SLOT(SendServerState()));
+    connect(this,SIGNAL(CameraError(uint)),this,SLOT(SendServerState()));
+    connect(this,SIGNAL(CameraStatus(QString)),this,SLOT(SendServerState()));
 
     serverVersionString.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
     QString str;
@@ -103,6 +115,12 @@ Server::~Server()
 //    if ( !guiSocket.empty() ) {
 //        foreach (QTcpSocket *s, guiSocket) if ( s != nullptr ) s->disconnectFromHost();
 //    }
+
+    packetHandlerThread.quit();
+    bool ok = packetHandlerThread.wait(NetworkTimeout);
+    if ( !ok ) packetHandlerThread.terminate();
+
+    delete packetHandler;
 
     if ( clientSocket != nullptr) {
         clientSocket->disconnectFromHost();
@@ -221,7 +239,7 @@ void Server::ClientConnection()
         hello_msg += "New NEWTON CLIENT connection from " + client_address.toString();
         emit HelloIsReceived(hello_msg);
 
-        SEND_STATUS(socket);
+        SEND_STATUS(socket); // send OK-status, i.e., server is ready for command acception
 
         newClientConnection = false;
         clientSocket = socket;
@@ -234,7 +252,8 @@ void Server::ClientConnection()
 
     } else if ( senderType == NETPROTOCOL_SENDER_TYPE_GUI ) {
         guiSocket << socket;
-        connect(socket,SIGNAL(disconnected()),this,SLOT(GUIDisconnected()));
+//        connect(socket,SIGNAL(disconnected()),this,SLOT(GUIDisconnected()));
+        packetHandler->AddSocket(socket);
 
         hello_msg = "<b>";
         hello_msg += TIME_STAMP;
@@ -243,27 +262,7 @@ void Server::ClientConnection()
         emit HelloIsReceived(hello_msg);
 
         // send server current state
-        server_status_packet.SetStatus(lastError,cameraStatus); // camera error and status
-        SEND_STATUS(socket);
-//        server_status_packet.SetStatus(lastSocketError,""); // network error
-//        SEND_STATUS(socket);
-//        server_status_packet.SetStatus(100,cameraStatus); // camera status
-//        SEND_STATUS(socket);
-        double tt;
-        unsigned int cc;
-
-        GetCCDTemperature(&tt,&cc);
-
-        TempNetPacket temp(tt,cc); // CCD temperature
-//        TempNetPacket temp(currentTemperature,currentCoolerStatus); // CCD temperature
-
-        ok = temp.Send(socket,NetworkTimeout);
-        if ( !ok ) {
-            qDebug() << "ERROR OF CAMERA TEMPERATURE SENDING! " << "Packet error: " << temp.GetPacketError();
-            lastSocketError = socket->error();
-            emit ServerSocketError(lastSocketError);
-            socket->disconnectFromHost();
-        }
+        SendServerState();
     } else { // unknown, just reject
         socket->disconnectFromHost();
         return;
@@ -310,7 +309,7 @@ void Server::ExecuteCommand()
         server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
         SEND_STATUS(clientSocket);
 
-        packetHandler->SendPacket(&guiSocket,pk);
+//        packetHandler->SendPacket(&guiSocket,pk);
 
 #ifdef QT_DEBUG
         qDebug() << "SERVER: send status [" << server_status_packet.GetByteView() << "] status = " << ok;
@@ -455,6 +454,8 @@ void Server::ExecuteCommand()
     }
     default: break;
     }
+
+    delete clientPacket;
 }
 
 
@@ -475,6 +476,16 @@ void Server::GUIDisconnected() // remove socket of disconnected server GUI
 }
 
 
-                /*  Private members  */
+                /*  Protected methods  */
 
+void Server::SendServerState()
+{
+    double temp;
+    unsigned int cool_status;
 
+    GetCCDTemperature(&temp,&cool_status);
+
+    currentStatePacket.SetParams(lastError,temp,cool_status,currentExposureClock,cameraStatus);
+
+    emit UpdateRemoteGui(&currentStatePacket);
+}

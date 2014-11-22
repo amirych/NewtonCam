@@ -218,6 +218,8 @@ public:
                  const unsigned int cooler_status,
                  const double exp_clock, const QString &camera_status);
 
+    GuiNetPacket(const NetPacket &packet);
+
     void SetParams(const unsigned int camera_err, const double temp,
                    const unsigned int cooler_status,
                    const double exp_clock, const QString &camera_status);

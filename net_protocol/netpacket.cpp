@@ -968,6 +968,13 @@ GuiNetPacket::GuiNetPacket(): GuiNetPacket(DRV_SUCCESS, 0.0, DRV_TEMP_OFF, 0.0, 
 }
 
 
+GuiNetPacket::GuiNetPacket(const NetPacket &packet)
+{
+    SetContent(PACKET_ID_GUI,packet.GetPacketContent());
+    ParseContent();
+}
+
+
 void GuiNetPacket::Init()
 {
     QString str;
