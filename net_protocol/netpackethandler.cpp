@@ -6,7 +6,7 @@
 NetPacketHandler::NetPacketHandler(QTcpSocket *socket, QObject *parent):
     QObject(parent), current_socket(socket),
     send_socket_queue(QList<QTcpSocket*>()), receive_queue(QList<NetPacket*>()),
-    lastError(PACKET_ERROR_OK), newPacket(true), networkTimeout(NETPROTOCOL_TIMEOUT)
+    lastError(PACKET_ERROR_OK), networkTimeout(NETPROTOCOL_TIMEOUT), newPacket(true)
 {
     packet = new NetPacket();
 }
@@ -174,7 +174,8 @@ void NetPacketHandler::SendPacket(NetPacket *packet)
 #endif
 
     foreach (QTcpSocket* socket, send_socket_queue) {
-        bool ok = packet->Send(socket,networkTimeout);
+        packet->Send(socket,networkTimeout);
+//        bool ok = packet->Send(socket,networkTimeout);
 //        if ( !ok ) return;
     }
 }
@@ -202,20 +203,3 @@ void NetPacketHandler::SocketDisconnected()
 }
                 /*  Private methods  */
 
-void NetPacketHandler::SplitContent(QString &left, QString &right)
-{
-    if ( Content.isEmpty() || Content.isNull() ) {
-        left.clear();
-        right.clear();
-    }
-
-    int idx = Content.indexOf(NETPROTOCOL_CONTENT_DELIMETER, Qt::CaseInsensitive);
-
-    if ( idx == -1 ) {
-        left = Content;
-        right = "";
-    } else {
-        left = Content.mid(0,idx);
-        right = Content.mid(idx);
-    }
-}

@@ -151,7 +151,6 @@ void Camera::InitCamera(QString init_path, long camera_index)
     emit CameraStatus(cameraStatus);
 
     at_32 no_cameras;
-    char sdk_ver[100];
 
     cameraStatus = CAMERA_STATUS_INIT_TEXT;
     emit CameraStatus(cameraStatus);
@@ -181,7 +180,8 @@ void Camera::InitCamera(QString init_path, long camera_index)
     ANDOR_API_CALL(Initialize,path);
     std::this_thread::sleep_for(std::chrono::seconds(2)); // wait for init proccess finished
 
-    ANDOR_API_CALL(GetVersionInfo,AT_DeviceDriverVersion,sdk_ver,100);
+    char driver_ver[100];
+    ANDOR_API_CALL(GetVersionInfo,AT_DeviceDriverVersion,driver_ver,100);
 #endif
 
     // start CCD chip temperature polling

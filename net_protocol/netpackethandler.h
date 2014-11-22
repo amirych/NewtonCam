@@ -69,12 +69,6 @@ private:
 
     bool newPacket;
 
-    NetPacket::NetPacketID ID;
-    long Content_LEN;
-    QString Content;
-    QByteArray Packet;
-
-    void SplitContent(QString &left, QString &right);
 };
 
 #endif // NETPACKETHANDLER_H

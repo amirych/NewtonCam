@@ -231,8 +231,8 @@ public:
     GuiNetPacket& Receive(QTcpSocket *socket, int timeout);
 private:
     unsigned int cameraError;
-    unsigned int coolerStatus;
     double ccdTemp;
+    unsigned int coolerStatus;
     QString cameraStatus;
     double exposureClock;
 
