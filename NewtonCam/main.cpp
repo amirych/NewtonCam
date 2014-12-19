@@ -21,7 +21,7 @@
 #include <fstream>
 #include <csignal>
 
-#include <QtConcurrent/QtConcurrent>
+//#include <QtConcurrent/QtConcurrent>
 
 #define CAMERA_DEFAULT_LOG_FILENAME "NewtonCam.log"
 #define CAMERA_DEFAULT_INIT_PATH ""

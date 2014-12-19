@@ -216,7 +216,15 @@ void Camera::InitCamera(QString init_path, long camera_index)
 
     std::this_thread::sleep_for(std::chrono::seconds(2)); // sleep for init proccess finishing
 
+#ifdef Q_OS_WIN
     char head_model[MAX_PATH];
+#endif
+
+// MAX_PATH was not declared in Andor header file!!!
+#ifdef Q_OS_LINUX
+    char head_model[1024];
+#endif
+
     ANDOR_API_CALL(GetHeadModel,head_model);
     headModel = head_model;
     LogOutput("   [CAMERA] Head model: " + headModel);
