@@ -16,6 +16,9 @@ public:
     void stop();
     void run();
 
+signals:
+    void Camera_IDLE();
+
 private:
     Camera *camera;
     unsigned long polling_interval;

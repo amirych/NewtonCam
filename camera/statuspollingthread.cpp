@@ -1,7 +1,8 @@
 #include "statuspollingthread.h"
 
 StatusPollingThread::StatusPollingThread(Camera *cam, unsigned int poll_int):
-    QThread(cam), camera(cam), polling_interval(poll_int), stop_thread(false)
+    QThread(), camera(cam), polling_interval(poll_int), stop_thread(false)
+//  QThread(cam), camera(cam), polling_interval(poll_int), stop_thread(false)
 {
 
 }
@@ -10,8 +11,11 @@ StatusPollingThread::StatusPollingThread(Camera *cam, unsigned int poll_int):
 void StatusPollingThread::setInterval(unsigned long poll_int)
 {
     polling_interval = poll_int;
-    stop();
-    start();
+    if ( isRunning() ) {
+        stop();
+        wait(2000);
+        start();
+    }
 }
 
 

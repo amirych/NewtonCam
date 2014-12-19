@@ -48,6 +48,8 @@ public:
 
     QAbstractSocket::SocketError getLastSocketError() const;
 
+    bool isListening() const;
+
     ~Server();
 
     void SetNetworkTimeout(const int timeout);
@@ -87,7 +89,6 @@ protected:
     GuiNetPacket currentStatePacket;
 
     QThread packetHandlerThread;
-
 };
 
 #endif // SERVER_H

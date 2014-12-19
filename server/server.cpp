@@ -116,6 +116,7 @@ Server::~Server()
 //        foreach (QTcpSocket *s, guiSocket) if ( s != nullptr ) s->disconnectFromHost();
 //    }
 
+
     packetHandlerThread.quit();
     bool ok = packetHandlerThread.wait(NetworkTimeout);
     if ( !ok ) packetHandlerThread.terminate();
@@ -168,6 +169,12 @@ void Server::ClientConnection()
     QTcpSocket *socket = net_server->nextPendingConnection();
     QHostAddress client_address = socket->peerAddress();
 
+    QString log_str = "   [SERVER] New connection from ";
+    log_str += client_address.toString();
+    log_str += " ... Trying handshaking ...";
+
+    LogOutput(log_str);
+
     // who asked for connection. Receive HELLO message from client
     HelloNetPacket hello;
 
@@ -185,7 +192,11 @@ void Server::ClientConnection()
     QString senderVersion;
     QString senderType = hello.GetSenderType(&senderVersion);
 
+    LogOutput("   [SERVER] Connection is from " + senderType);
+
     // send server HELLO message
+
+    LogOutput("   [SERVER] Send HELLO message ... ", true, false);
 
     hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_SERVER,serverVersionString);
     ok = hello.Send(socket,NetworkTimeout);
@@ -200,12 +211,16 @@ void Server::ClientConnection()
     qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
 #endif
 
+    LogOutput("OK",false);
+
     QString hello_msg;
     server_status_packet.SetStatus(SERVER_ERROR_OK,"OK");
+
 
     if ( senderType == NETPROTOCOL_SENDER_TYPE_CLIENT ) {
 //        if ( clientSocket != nullptr ) { // client already connected
         if ( !newClientConnection ) { // client already connected
+            LogOutput("   [SERVER] Command client is already connected! Reject the connection!");
             server_status_packet.SetStatus(SERVER_ERROR_BUSY,"Server is busy");
 
 #ifdef QT_DEBUG
@@ -219,7 +234,12 @@ void Server::ClientConnection()
         }
 
         // check for client address is in allowed list
+
+        LogOutput("   [SERVER] Looking client address in allowed list ... ", true, false);
+
         if ( !allowed_hosts.contains(client_address) ) { // check for client is in allowed host list
+            LogOutput("NO! Reject the connection!",false);
+
             server_status_packet.SetStatus(SERVER_ERROR_DENIED,"Server refused the connection");
 
 #ifdef QT_DEBUG
@@ -232,6 +252,7 @@ void Server::ClientConnection()
             return;
         }
 
+        LogOutput("OK",false);
 
         hello_msg = "<b>";
         hello_msg += TIME_STAMP;
@@ -321,31 +342,32 @@ void Server::ExecuteCommand()
 
 #ifdef QT_DEBUG
         qDebug() << "SERVER: CMD-packet has been recieved [" << pk->GetCmdName() << "]";
+        qDebug() << "SERVER: CMD-packet: " << pk->GetPacketContent();
 #endif
 
         QString command_name = pk->GetCmdName();
 
+        // execute the command
+
         if ( command_name == NETPROTOCOL_COMMAND_STOP ) {
             StopExposure();
-            return;
+            server_status_packet.SetStatus(lastError,"");
         } else if ( command_name == NETPROTOCOL_COMMAND_INIT ) { // re-init camera
             InitCamera();
-            last_oper_status = (lastError == DRV_SUCCESS) ? Server::SERVER_ERROR_OK : lastError;
-            server_status_packet.SetStatus(last_oper_status,"");
-            SEND_STATUS(clientSocket);
-//            return;
+            server_status_packet.SetStatus(lastError,"");
         } else if ( command_name == NETPROTOCOL_COMMAND_BINNING ) {
             QVector<double> bin_vals;
             QVector<int> bin_vals_int;
             ok = pk->GetCmdArgs(&bin_vals);
             if ( !ok ) {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
-                SEND_STATUS(clientSocket);
-            }
+            } else {
+                DOUBLE_TO_INT(bin_vals,bin_vals_int);
+                server_status_packet.SetStatus(lastError,"");
 #ifdef QT_DEBUG
-            DOUBLE_TO_INT(bin_vals,bin_vals_int);
             qDebug() << "SERVER: ARGS: " << bin_vals_int;
 #endif
+            }
         } else if ( command_name == NETPROTOCOL_COMMAND_ROI ) {
             QVector<double> roi_vals;
             QVector<int> roi_vals_int;
@@ -353,16 +375,52 @@ void Server::ExecuteCommand()
             ok = pk->GetCmdArgs(&roi_vals);
             if ( !ok ) {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
-                SEND_STATUS(clientSocket);
-            }
+            } else {
+                DOUBLE_TO_INT(roi_vals,roi_vals_int);
+                server_status_packet.SetStatus(lastError,"");
 #ifdef QT_DEBUG
-            DOUBLE_TO_INT(roi_vals,roi_vals_int);
             qDebug() << "SERVER: ARGS: " << roi_vals_int;
 #endif
+            }
         } else if ( command_name == NETPROTOCOL_COMMAND_GAIN ) {
-
+            QString gain_str;
+            ok = pk->GetCmdArgs(&gain_str);
+            SetCCDGain(gain_str);
+            server_status_packet.SetStatus(lastError,"");
+        } else if ( command_name == NETPROTOCOL_COMMAND_COOLER ) {
+            QString cooler_state;
+            ok = pk->GetCmdArgs(&cooler_state);
+            cooler_state = cooler_state.toUpper().trimmed();
+#ifdef QT_DEBUG
+            qDebug() << "[SERVER]: Cooler is " << cooler_state << "; ok = " << ok;
+#endif
+            if ( !ok || cooler_state.isEmpty() ) {
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+            } else {
+                if ( cooler_state == "ON" ) {
+                    SetCoolerON();
+                    server_status_packet.SetStatus(lastError,"");
+                } else if ( cooler_state == "OFF" ) {
+                    SetCoolerOFF();
+                    server_status_packet.SetStatus(lastError,"");
+                } else {
+                    server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+                }
+            }
+        } else if ( command_name == NETPROTOCOL_COMMAND_FAN ) {
+            QString fan_state;
+            ok = pk->GetCmdArgs(&fan_state);
+            if ( !ok ) {
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+            } else {
+                SetFanState(fan_state);
+                server_status_packet.SetStatus(lastError,"");
+            }
         } else if ( command_name == NETPROTOCOL_COMMAND_RATE ) {
-
+            QString rate_str;
+            ok = pk->GetCmdArgs(&rate_str);
+            SetRate(rate_str);
+            server_status_packet.SetStatus(lastError,"");
         } else if ( command_name == NETPROTOCOL_COMMAND_SHUTTER ) {
             double flag;
 
@@ -372,28 +430,41 @@ void Server::ExecuteCommand()
 #endif
             if ( !ok ) {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
-                SEND_STATUS(clientSocket);
-                return;
+            } else {
+                server_status_packet.SetStatus(lastError,"");
             }
         } else if ( command_name == NETPROTOCOL_COMMAND_EXPTIME ) {
             ok = pk->GetCmdArgs(&currentExposureClock);
             if ( !ok ) {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
-                SEND_STATUS(clientSocket);
+            } else {
+                SetExpTime(currentExposureClock);
+                server_status_packet.SetStatus(lastError,"");
             }
-            SetExpTime(currentExposureClock);
         } else if ( command_name == NETPROTOCOL_COMMAND_SETTEMP ) {
-
+            double temp;
+            int temp_int;
+            ok = pk->GetCmdArgs(&temp);
+            if ( !ok ) {
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+            } else {
+                temp_int = static_cast<int>(temp);
+                SetCCDTemperature(temp_int);
+                server_status_packet.SetStatus(lastError,"");
+            }
         } else if ( command_name == NETPROTOCOL_COMMAND_GETTEMP ) {
             double temp;
             unsigned int cool_stat;
             GetCCDTemperature(&temp,&cool_stat);
+            server_status_packet.SetStatus(lastError,"");
+
+            if ( lastError != DRV_SUCCESS ) { // if temperature asking function failed send fake values
+                temp = 0.0;
+                cool_stat = DRV_ERROR_ACK;
+            }
+
             TempNetPacket pk;
             pk.SetTemp(temp,cool_stat);
-#ifdef QT_DEBUG
-            qDebug() << "SERVER: send temp. packet: " << pk.GetByteView();
-            qDebug() << "SERVER: temp: " << temp << ", cool: " << cool_stat;
-#endif
             ok = pk.Send(clientSocket);
             if ( !ok ) {
                 lastSocketError = clientSocket->error();
@@ -401,25 +472,43 @@ void Server::ExecuteCommand()
                 clientSocket->disconnectFromHost();
                 return;
             }
-//            server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"");
-//            SEND_STATUS(clientSocket);
         } else if ( command_name == NETPROTOCOL_COMMAND_FITSFILE ) {
-
+            ok = pk->GetCmdArgs(&currentFITS_Filename);
+            currentFITS_Filename = currentFITS_Filename.trimmed();
+            if ( !ok || currentFITS_Filename.isEmpty() ) { // an empty filename
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+            } else {
+                server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
+            }
         } else if ( command_name == NETPROTOCOL_COMMAND_HEADFILE ) {
-
+            ok = pk->GetCmdArgs(&currentHDR_Filename);
+            currentHDR_Filename = currentHDR_Filename.trimmed();
+            if ( !ok || currentHDR_Filename.isEmpty() ) { // an empty filename
+                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+            } else {
+                server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
+            }
         } else {
             server_status_packet.SetStatus(Server::SERVER_ERROR_UNKNOWN_COMMAND,"UNKNOWN COMMAND");
             qDebug() << "[[[" << server_status_packet.GetByteView() << "]]]";
-            SEND_STATUS(clientSocket);
-            return;
         }
 
         // command was executed, send its exit status
-        server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
+
+//        server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
+
+        // DRV_SUCCESS means OK, so send error code Server::SERVER_ERROR_OK to client
+        if ( server_status_packet.GetStatus() == DRV_SUCCESS ) {
+            server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
+        }
+
+
 #ifdef QT_DEBUG
         qDebug() << "SERVER: sending status [" << server_status_packet.GetByteView();
 #endif
+
         SEND_STATUS(clientSocket);
+
 #ifdef QT_DEBUG
         qDebug() << "net. status = " << ok;
 #endif
@@ -476,6 +565,15 @@ void Server::GUIDisconnected() // remove socket of disconnected server GUI
 }
 
 
+bool Server::isListening() const
+{
+    if ( net_server != nullptr ) {
+        return net_server->isListening();
+    } else {
+        return false;
+    }
+}
+
                 /*  Protected methods  */
 
 void Server::SendServerState()
@@ -483,9 +581,10 @@ void Server::SendServerState()
     double temp;
     unsigned int cool_status;
 
-    GetCCDTemperature(&temp,&cool_status);
+//    GetCCDTemperature(&temp,&cool_status);
 
-    currentStatePacket.SetParams(lastError,temp,cool_status,currentExposureClock,cameraStatus);
+//    currentStatePacket.SetParams(lastError,temp,cool_status,currentExposureClock,cameraStatus);
+    currentStatePacket.SetParams(lastError,currentTemperature,currentCoolerStatus,currentExposureClock,cameraStatus);
 
     emit UpdateRemoteGui(&currentStatePacket);
 }

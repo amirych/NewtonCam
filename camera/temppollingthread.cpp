@@ -5,7 +5,8 @@
 #endif
 
 TempPollingThread::TempPollingThread(Camera *cam, unsigned long poll_int):
-    QThread(cam), camera(cam), polling_interval(poll_int), stop_thread(false)
+    QThread(), camera(cam), polling_interval(poll_int), stop_thread(false)
+//  QThread(cam), camera(cam), polling_interval(poll_int), stop_thread(false)
 {
     if ( polling_interval == 0 ) ++polling_interval;
 
@@ -18,8 +19,11 @@ TempPollingThread::TempPollingThread(Camera *cam, unsigned long poll_int):
 void TempPollingThread::setPollingInterval(unsigned long poll_int)
 {
     polling_interval = (poll_int == 0 ) ? 1: poll_int;
-    stop();
-    start();
+    if ( isRunning() ) {
+        stop();
+        wait(2000);
+        start();
+    }
 }
 
 
@@ -37,7 +41,7 @@ void TempPollingThread::run()
     unsigned int cool;
 
     while ( !stop_thread ) {
-        camera->tempMutex.lock();
+//        camera->tempMutex.lock();
 
 #ifdef EMULATOR_MODE
         temp = camera->currentTemperature;
@@ -61,6 +65,9 @@ void TempPollingThread::run()
         cool = GetTemperatureF(&temp);
 #endif
 
+        camera->tempMutex->lock();
+//        qDebug() << "[TEMPPOLL] lock tempMutex";
+
         if ( camera->currentTemperature != temp ) {
             camera->currentTemperature = temp;
             emit camera->TemperatureChanged(camera->currentTemperature);
@@ -70,7 +77,8 @@ void TempPollingThread::run()
             emit camera->CoolerStatusChanged(cool);
         }
 
-        camera->tempMutex.unlock();
+        camera->tempMutex->unlock();
+//        qDebug() << "[TEMPPOLL] unlock tempMutex";
 
         // wait for polling interval
         for ( unsigned int tick = 1; (tick <= polling_interval) && !stop_thread; ++tick) QThread::sleep(1);

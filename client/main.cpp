@@ -29,7 +29,8 @@
 
 // client errors
 
-enum ClientError {CLIENT_ERROR_OK, CLIENT_ERROR_INVALID_OPTION = 10, CLIENT_ERROR_CONNECTION,
+enum ClientError {CLIENT_ERROR_OK, CLIENT_ERROR_INVALID_OPTION = 10, CLIENT_ERROR_INVALID_FITS_FILENAME,
+                  CLIENT_ERROR_INVALID_HDR_FILENAME, CLIENT_ERROR_CONNECTION,
                   CLIENT_ERROR_UNKNOWN_SERVER, CLIENT_ERROR_INVALID_SERVER_STATUS, CLIENT_ERROR_INVALID_TEMP_RESPONSE};
 
 // send command macro
@@ -89,6 +90,10 @@ int main(int argc, char *argv[])
 
     QCommandLineOption shutterOption(QStringList() << "s" << "shutter", "Shutter control", "boolean value", "1");
 
+    QCommandLineOption coolerOption(QStringList() << "c" << "cooler", "Cooler control", "ON/OFF string");
+
+    QCommandLineOption fanOption("fan", "Set fan state", "Fan state string (FULL, LOW, OFF)");
+
     QCommandLineOption tempOption("settemp", "Set CCD chip temperature", "degrees");
 
     QCommandLineOption gettempOption("gettemp", "Get CCD chip temperature");
@@ -111,6 +116,8 @@ int main(int argc, char *argv[])
     cmdline_parser.addOption(roiOption);
     cmdline_parser.addOption(rateOption);
     cmdline_parser.addOption(shutterOption);
+    cmdline_parser.addOption(coolerOption);
+    cmdline_parser.addOption(fanOption);
     cmdline_parser.addOption(tempOption);
     cmdline_parser.addOption(gettempOption);
 
@@ -179,6 +186,28 @@ int main(int argc, char *argv[])
         return CLIENT_ERROR_INVALID_OPTION;
     }
 
+    // cooler operation
+    QString cooler_str = cmdline_parser.value(coolerOption).toUpper().trimmed();
+    if ( !cooler_str.isEmpty() ) {
+        if ( (cooler_str != "ON") && (cooler_str != "OFF") ) {
+#ifdef QT_DEBUG
+            qDebug() << "BAD COOLER STATE VALUE! (" << cooler_str << ")";
+#endif
+            return CLIENT_ERROR_INVALID_OPTION;
+        }
+    }
+
+
+    // fan operation
+    QString fan_str = cmdline_parser.value(fanOption).toUpper().trimmed();
+    if ( !fan_str.isEmpty() ) {
+        if ( (fan_str != "FULL") && (fan_str != "LOW") && (fan_str != "OFF") ) {
+#ifdef QT_DEBUG
+            qDebug() << "BAD FAN STATE VALUE!";
+#endif
+            return CLIENT_ERROR_INVALID_OPTION;
+        }
+    }
 
     // CCD temperature
     QString temp_str = cmdline_parser.value(tempOption);
@@ -200,6 +229,26 @@ int main(int argc, char *argv[])
     }
     quint16 server_port = port_str.toULong();
 
+    // check positional arguments (FITS and optional header files) if present
+
+    QStringList pos_args = cmdline_parser.positionalArguments();
+
+    bool send_shutter = false;
+
+    if ( !pos_args.isEmpty() ) {
+        QString str = pos_args[0].trimmed();
+        if ( str.isEmpty() ) {
+            return CLIENT_ERROR_INVALID_FITS_FILENAME;
+        }
+        send_shutter = true;
+
+        if ( pos_args.length() > 1 ) {
+            str = pos_args[1].trimmed();
+            if ( str.isEmpty() ) {
+                return CLIENT_ERROR_INVALID_HDR_FILENAME;
+            }
+        }
+    }
 
                 /*  Try to connect to server  */
 
@@ -277,7 +326,7 @@ int main(int argc, char *argv[])
         SERVER_STATUS;
     }
 
-    // --gettemp, it is a special command! The program receives a CCD temperature and exit!
+    // --gettemp, it is a special command! The program receives a CCD temperature and cooler status, then exit!
 
     if ( cmdline_parser.isSet(gettempOption)) {
         info_stream << NETPROTOCOL_COMMAND_GETTEMP << " ";
@@ -385,10 +434,33 @@ int main(int argc, char *argv[])
 
     // --shutter (-s)
 
-    command_packet.SetCommand(NETPROTOCOL_COMMAND_SHUTTER, shutter_state == 0 ? 0.0 : 1.0);
-    info_stream << command_packet.GetPacketContent() << " ";
-    SEND_COMMAND;
-    SERVER_STATUS;
+    if ( send_shutter ) { // if FITS-file is given then send SHUTTER-command
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_SHUTTER, shutter_state == 0 ? 0.0 : 1.0);
+        info_stream << command_packet.GetPacketContent() << " ";
+        SEND_COMMAND;
+        SERVER_STATUS;
+    }
+
+
+    // --cooler (-c)
+
+    if ( !cooler_str.isEmpty() ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_COOLER,cooler_str);
+        info_stream << command_packet.GetPacketContent() << " ";
+        SEND_COMMAND;
+        SERVER_STATUS;
+    }
+
+
+    // --fan
+
+    if ( !fan_str.isEmpty() ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_FAN,fan_str);
+//        qDebug() << "FAN: " << command_packet.GetByteView();
+        info_stream << command_packet.GetPacketContent() << " ";
+        SEND_COMMAND;
+        SERVER_STATUS;
+    }
 
 
     // --settemp
@@ -403,7 +475,7 @@ int main(int argc, char *argv[])
 
     // positional arguments (FITS and optional header files) if present
 
-    QStringList pos_args = cmdline_parser.positionalArguments();
+//    QStringList pos_args = cmdline_parser.positionalArguments();
 
     if ( !pos_args.isEmpty() ) {
         // result FITS-file name

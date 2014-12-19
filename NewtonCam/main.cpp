@@ -16,13 +16,17 @@
 #include <QDateTime>
 #include <QRegExp>
 #include <QObject>
+#include <QThread>
 #include <iostream>
 #include <fstream>
 #include <csignal>
 
+#include <QtConcurrent/QtConcurrent>
 
 #define CAMERA_DEFAULT_LOG_FILENAME "NewtonCam.log"
 #define CAMERA_DEFAULT_INIT_PATH ""
+
+
 
                 /****************************************
                 *                                       *
@@ -31,6 +35,19 @@
                 ****************************************/
 
 static QApplication *myApp;
+static QThread* serverThread = nullptr;
+
+void shutdownApp()
+{
+#ifdef QT_DEBUG
+    qDebug() << "Shutdown NewtonCam";
+#endif
+    if ( serverThread != nullptr ) {
+        serverThread->quit();
+        serverThread->wait(3000);
+        delete serverThread;
+    }
+}
 
 // POSIX OS signal handler
 #ifdef Q_OS_UNIX
@@ -254,7 +271,13 @@ int main(int argc, char *argv[])
     QWidget root_widget;
 
     if ( !cmdline_parser.isSet(noguiOption) ) {
+        serverThread = new QThread;
+        CamServer.moveToThread(serverThread);
+//        QObject::connect(&app,SIGNAL(aboutToQuit()),serverThread,SLOT(quit()));
+        QObject::connect(&app,&QCoreApplication::aboutToQuit,[=](){shutdownApp();});
+
         serverGUI = new ServerGUI(&root_widget);
+
         serverGUI->SetFonts(fontsize,statusFontsize,logFontsize);
         serverGUI->show();
 
@@ -271,6 +294,7 @@ int main(int argc, char *argv[])
                          serverGUI,SLOT(NetworkError(QAbstractSocket::SocketError)));
         QObject::connect(&CamServer,SIGNAL(ExposureClock(double)),serverGUI,SLOT(ExposureProgress(double)));
         app.processEvents();
+        serverThread->start();
     }
 
     // init path handling
@@ -279,12 +303,19 @@ int main(int argc, char *argv[])
     }
 
     CamServer.SetPollingIntervals(temp_poll_int,CAMERA_DEFAULT_STATUS_POLLING_INT);
+
+    if ( !cmdline_parser.isSet(noguiOption) ) {
+        serverGUI->ServerStatus(CAMERA_STATUS_INIT_TEXT);
+        app.processEvents();
+    }
+
+
+    // It still rans in the main thread!!!
     CamServer.InitCamera(cameraInitPath,0);
 
-//    if ( CamServer.getLastServerError() != Server::SERVER_ERROR_OK ) {
-//        std::cerr << "Camera server failed to start!\n";
-//        exit(CamServer.getLastServerError());
-//    }
+    if ( !CamServer.isListening() ) {
+        std::cerr << "Camera server failed to listening network socket!\n";
+    }
 
 #ifdef Q_OS_UNIX
     std::signal(SIGINT, signal_handler_int);

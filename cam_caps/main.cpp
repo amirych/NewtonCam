@@ -26,8 +26,8 @@ int main(int argc, char* argv[])
     }
 
     unsigned int err;
-    int numADchans, numAmp, numPreAmpGains, BitDepth, numHSpeeds, isPreAmp;
-    float HSpeed,gain;
+    int numADchans, numAmp, numPreAmpGains, BitDepth, numHSpeeds, numVSpeeds, isPreAmp;
+    float VSpeed,HSpeed,gain;
 
     AndorCapabilities caps;
     caps.ulSize = sizeof(AndorCapabilities);
@@ -49,30 +49,42 @@ int main(int argc, char* argv[])
 
         cout << "Number of gains: " << numPreAmpGains << endl;
 
-        for ( long i_chan = 0; i_chan < (numADchans-1); ++i_chan ) {
+        for ( long i_chan = 0; i_chan < numADchans; ++i_chan ) {
             cout << "   AD channel: " << i_chan << endl;
 
             CALL_API(GetBitDepth,i_chan,&BitDepth);
             cout << "       bit depth: " << BitDepth << endl;
 
-            for ( long i_amp = 0; i_amp < (numAmp-1); ++i_amp ) {
+            for ( long i_amp = 0; i_amp < numAmp; ++i_amp ) {
                 CALL_API(GetNumberHSSpeeds,i_chan,i_amp,&numHSpeeds);
                 cout << "       number of HSpeeds: " << numHSpeeds << endl;
 
-                for ( long i_speed = 0; i_speed < (numHSpeeds-1); ++i_speed ) {
+                for ( long i_speed = 0; i_speed < numHSpeeds; ++i_speed ) {
                     CALL_API(GetHSSpeed,i_chan,i_amp,i_speed,&HSpeed);
-                    cout << "           speed: " << HSpeed << " usecs\n";
+                    cout << "\n           speed: " << HSpeed << " MHz\n";
 
-                    for ( long i_gain = 0; i_gain < (numPreAmpGains-1); ++i_gain ) {
+                    for ( long i_gain = 0; i_gain < numPreAmpGains; ++i_gain ) {
                         CALL_API(GetPreAmpGain,i_gain,&gain);
                         cout << "           gain: " << gain;
                         CALL_API(IsPreAmpGainAvailable,i_chan,i_amp,i_speed,i_gain,&isPreAmp);
-                        if ( isPreAmp ) cout << " (available)"; else cout << " (not available)\n";
+                        if ( isPreAmp ) cout << " (available)\n"; else cout << " (not available)\n";
                     }
                 }
             }
 
         }
+
+        CALL_API(GetNumberVSSpeeds,&numVSpeeds);
+        cout << "\nNumber of VSpeeds: " << numVSpeeds << endl;
+
+        for ( int i = 0; i < numVSpeeds; ++i ) {
+            CALL_API(GetVSSpeed,i,&VSpeed);
+            cout << "  VSpeed: " << VSpeed << " microsecs\n";
+        }
+
+        int idx;
+        CALL_API(GetFastestRecommendedVSSpeed,&idx,&VSpeed);
+        cout << "  Recommended fastest VSpeed: " << idx << " (" << VSpeed << " microsecs)\n";
 
         CALL_API(GetCapabilities,&caps);
 

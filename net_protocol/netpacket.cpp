@@ -514,7 +514,7 @@ QString CmdNetPacket::GetCmdName() const
 bool CmdNetPacket::GetCmdArgs(QString *args)
 {
     *args = Args;
-    return Args.isEmpty() ? true : false;
+    return !Args.isEmpty() ? true : false;
 }
 
 
@@ -559,6 +559,7 @@ void CmdNetPacket::ParseContent()
     ArgsVec.clear();
 
     split_content(Content,CmdName,Args);
+//    qDebug() << "CmdPacket::ParseContent: ARGS: " << Args << "; Name: " << CmdName;
 }
 
 CmdNetPacket& CmdNetPacket::Receive(QTcpSocket *socket, int timeout)
