@@ -14,10 +14,12 @@
 
 #ifdef Q_OS_WIN
     #include "../AndorSDK/atmcd32d.h"
+    typedef WORD buffer_t;
 #endif
 
 #ifdef Q_OS_LINUX
     #include "../AndorSDK/atmcdLXd.h"
+    typedef unsigned short buffer_t;
 #endif
 
 
@@ -27,6 +29,8 @@
             *  Andor Newton camera API wrapper class  *
             *                                         *
             ******************************************/
+
+#define CAMERA_FITS_ERROR_BASE 700 // displacement for the FITS error codes
 
 #define CAMERA_STATUS_UNINITILIZED_TEXT "<font color=red>Uninitialized</font>"
 #define CAMERA_STATUS_INIT_TEXT         "<font color=red>Initialization ...</font>"
@@ -69,6 +73,8 @@ class CAMERASHARED_EXPORT Camera: public QObject
     friend class TempPollingThread;
     friend class StatusPollingThread;
 public:
+    enum CameraErrorCode {CAMERA_ERROR_OK, CAMERA_ERROR_BADALLOC = 100, CAMERA_ERROR_FITS_FILENAME};
+
     explicit Camera(QObject *parent = 0);
     Camera(long camera_index, QObject *parent = 0);
     Camera(std::ostream &log_file, long camera_index = 0, QObject *parent = 0);
@@ -99,7 +105,7 @@ public:
     // frame control
 
     void SetFrame(const int hbin, const int vbin,
-                  const int xstart, const int xend, const int ystart, const int yend);
+                  const int xstart, const int ystart, const int xsize, const int ysize);
 
     // acquisition control
     void SetExpTime(const double exp_time);
@@ -162,10 +168,28 @@ protected:
 
     int serialNumber;
 
-    int currentImage_Xsize;
-    int currentImage_Ysize;
-    int currentImage_binX;
-    int currentImage_binY;
+    unsigned int firmwareVersion;
+    unsigned int firmwareBuild;
+
+    QString currentRate;
+    QString currentGain;
+
+    int detector_Xsize; // detector dimensions
+    int detector_Ysize;
+
+    int currentImage_startX;  // holds start X-coordinate in term of detector pixels (starts from 1)
+    int currentImage_startY;  // holds start Y-coordinate in term of detector pixels (starts from 1)
+    int currentImage_Xsize;   // holds size of image along X-coordinate in term of binned pixels
+    int currentImage_Ysize;   // holds size of image along Y-coordinate in term of binned pixels
+    int currentImage_binX;    // bin X
+    int currentImage_binY;    // bin Y
+
+    int maxBinning[2];
+    int temperatureRange[2];
+
+    buffer_t *currentImage_buffer;
+
+    QDateTime startExposureTime;
 
     void LogOutput(QString log_str, bool time_stamp = true, bool new_line = true);
     void LogOutput(QStringList &log_strs);
@@ -176,6 +200,8 @@ protected:
     unsigned int currentStatus;
 
     double currentExpTime;
+
+    bool isStopped;
 //#endif
 };
 

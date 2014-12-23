@@ -36,3 +36,10 @@ DEPENDPATH += $$PWD/../camera
 
 INCLUDEPATH += $$PWD/../AndorSDK
 DEPENDPATH += $$PWD/../AndorSDK
+
+win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
+else:unix:!macx: LIBS += -L$$PWD/../cfitsio/ -lcfitsio
+
+INCLUDEPATH += $$PWD/../cfitsio
+DEPENDPATH += $$PWD/../cfitsio

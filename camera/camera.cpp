@@ -13,6 +13,8 @@
 #include <thread>
 #include <chrono>
 
+#include <fitsio.h>
+
 //#ifdef Q_OS_WIN
 //    #include "atmcd32d.h"
 //#endif
@@ -36,6 +38,25 @@
             *LogFile << "error = " << lastError; \
         } \
         *LogFile << " (in " << __FILE__ << " at line " << __LINE__ << ")" << std::endl << std::flush; \
+    }\
+}
+
+
+#define CFITSIO_API_CALL(API_FUNC, ...) {\
+    API_FUNC(__VA_ARGS__); \
+    if ( LogFile != nullptr ) { \
+        *LogFile << TIME_STAMP; \
+        *LogFile << " [FITS API] " << #API_FUNC << "(" << #__VA_ARGS__ << "): "; \
+        if ( !fits_status ) { \
+            *LogFile << "OK "; \
+        } else { \
+            *LogFile << "error = " << fits_status; \
+        } \
+        *LogFile << " (in " << __FILE__ << " at line " << __LINE__ << ")" << std::endl << std::flush; \
+    }\
+    if ( fits_status ) { \
+        lastError = CAMERA_FITS_ERROR_BASE + fits_status;\
+        throw lastError;\
     }\
 }
 
@@ -73,7 +94,11 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     cameraStatus(CAMERA_STATUS_UNINITILIZED_TEXT), initPath(""),
     exp_timer(nullptr), currentExposureClock(0.0), currentExpTime(0.0),
     currentFITS_Filename(""), currentHDR_Filename(""),
-    headModel(""), driverVersion("")
+    headModel(""), driverVersion(""),
+    currentRate(""), currentGain(""),
+    currentImage_buffer(nullptr),
+    startExposureTime(QDateTime()),
+    isStopped(false)
 {
 #ifdef QT_DEBUG
     qDebug() << "Create Camera";
@@ -124,9 +149,8 @@ Camera::~Camera()
     ANDOR_API_CALL(ShutDown,);
     LogOutput("",false);
     LogOutput("Shutdown camera.");
-//    if ( LogFile != nullptr ) {
-//        *LogFile << TIME_STAMP << "Stop camera.\n";
-//    }
+
+    if ( currentImage_buffer != nullptr ) delete currentImage_buffer;
 }
 
             /*  public methods  */
@@ -197,7 +221,6 @@ void Camera::InitCamera(QString init_path, long camera_index)
 
     LogOutput("   [CAMERA] Initialization path: " + initPath);
     char* path = initPath.toUtf8().data();
-    LogOutput("   [CAMERA] Initialization proccess ...", true, false);
 
     ANDOR_API_CALL(Initialize,path);
 
@@ -238,21 +261,49 @@ void Camera::InitCamera(QString init_path, long camera_index)
     ANDOR_API_CALL(GetVersionInfo,AT_DeviceDriverVersion,driver_ver,100);
     driverVersion = driver_ver;
     LogOutput("   [CAMERA] Driver version: " + driverVersion);
+
+    unsigned int dummy;
+
+    ANDOR_API_CALL(GetHardwareVersion,&dummy,&dummy,&dummy,&dummy,&firmwareVersion,&firmwareBuild);
+    str.setNum(firmwareVersion);
+    LogOutput("   [CAMERA] Firmware version: " + str);
+    str.setNum(firmwareBuild);
+    LogOutput("   [CAMERA] Firmware build number: " + str);
 #endif
 
-    int t_min, t_max;
 
-    ANDOR_API_CALL(GetTemperatureRange,&t_min,&t_max);
-#ifdef QT_DEBUG
-    qDebug() << "Temperature range: [" << t_min << "," << t_max << "]";
-#endif
+    // some camera defined constants
+
+    ANDOR_API_CALL(GetTemperatureRange,temperatureRange,temperatureRange+1);
+    QString temprange;
+
+    temprange.setNum(temperatureRange[0]);
+    str.setNum(temperatureRange[1]);
+    temprange = "[" + temprange + ", " + str + "]";
+    LogOutput("   [CAMERA] Allowed temperature range: " + temprange);
+
+    ANDOR_API_CALL(GetMaximumBinning,4,0,maxBinning);
+    ANDOR_API_CALL(GetMaximumBinning,4,1,maxBinning+1);
+    QString maxbin;
+
+    maxbin.setNum(maxBinning[0]);
+    str.setNum(maxBinning[1]);
+    maxbin += "x" + str;
+    LogOutput("   [CAMERA] Maximal binning: " + maxbin);
 
     // initial values for image mode, size and binning
 
-    ANDOR_API_CALL(SetReadMode,4); // image mode!
+    // Currently, the software supports only Single Scan in Image Mode
+
+    ANDOR_API_CALL(SetAcquisitionMode,1); // single scan
+    ANDOR_API_CALL(SetReadMode,4); // image mode! ()
     ANDOR_API_CALL(GetDetector,&currentImage_Xsize,&currentImage_Ysize);
+    detector_Xsize = currentImage_Xsize;
+    detector_Ysize = currentImage_Ysize;
+    currentImage_startX = 1;
+    currentImage_startY = 1;
     currentImage_binX = 1;
-    currentImage_binX = 1;
+    currentImage_binY = 1;
     ANDOR_API_CALL(SetImage,currentImage_binX,currentImage_binY,1,currentImage_Xsize,1,currentImage_Ysize);
 
 #ifdef QT_DEBUG
@@ -297,6 +348,8 @@ void Camera::InitCamera(QString init_path, long camera_index)
 
     cameraStatus = CAMERA_STATUS_READY_TEXT;
     emit CameraStatus(cameraStatus);
+
+    LogOutput("   [CAMERA] Initialization was complete!\n");
 
 #ifdef QT_DEBUG
     qDebug() << "Is temperature polling started: " << tempPolling->isRunning();
@@ -440,25 +493,58 @@ void Camera::GetCCDTemperature(double *temp, unsigned int *cooler_stat)
 void Camera::SetExpTime(const double exp_time)
 {
     currentExpTime = exp_time;
-    StartExposure("","");
 #ifndef EMULATOR_MODE
     ANDOR_API_CALL(SetExposureTime,exp_time);
 #endif
 }
 
 
+//
+// Parameters: hbin, vbin - binning along X and Y axes, accordingly
+//             xstart, ystart - upper-left conner of the readout region in term of sensor pixels
+//             xsize, ysize - size of readout region (width and height) in term of binned pixels!
+//
+void Camera::SetFrame(const int hbin, const int vbin, const int xstart, const int ystart, const int xsize, const int ysize)
+{
+    int startX = xstart;
+    int startY = ystart;
+
+    if ( startX < 1 ) startX = 1;
+    if ( startY < 1 ) startY = 1;
+
+    int endX = startX + hbin*xsize - 1; // include last pixel
+    int endY = startY + vbin*ysize - 1;
+
+    if ( endX > detector_Xsize ) endX = detector_Xsize - ((detector_Xsize - startX + 1) % hbin);
+    if ( endY > detector_Ysize ) endY = detector_Ysize - ((detector_Ysize - startY + 1) % vbin);
+
+    currentImage_startX = startX;
+    currentImage_startY = startY;
+
+
+    if ( hbin < 1 ) currentImage_binX = 1; else currentImage_binX = hbin;
+    if ( vbin < 1 ) currentImage_binY = 1; else currentImage_binY = vbin;
+
+    currentImage_Xsize = (endX - startX)/currentImage_binX + 1;
+    currentImage_Ysize = (endY - startY)/currentImage_binY + 1;
+
+    ANDOR_API_CALL(SetImage,currentImage_binX,currentImage_binY,xstart,endX,ystart,endY);
+}
+
+
 void Camera::SetCCDGain(const QString gain_str)
 {
-    QString str = gain_str.trimmed().toUpper();
+    currentGain = gain_str.trimmed().toUpper();
 
     int idx;
-    if ( str == CAMERA_GAIN0_STR ) {
+    if ( currentGain == CAMERA_GAIN0_STR ) {
         idx = 0;
-    } else if ( str == CAMERA_GAIN1_STR ) {
+    } else if ( currentGain == CAMERA_GAIN1_STR ) {
         idx = 1;
-    } else if ( str == CAMERA_GAIN2_STR ) {
+    } else if ( currentGain == CAMERA_GAIN2_STR ) {
         idx = 2;
-    } else {
+    } else {        
+        currentGain = CAMERA_GAIN2_STR;
         idx = 2;
     }
 
@@ -468,17 +554,18 @@ void Camera::SetCCDGain(const QString gain_str)
 
 void Camera::SetRate(const QString rate_str)
 {
-    QString str = rate_str.trimmed().toUpper();
+    currentRate = rate_str.trimmed().toUpper();
 
     int idx;
 
-    if ( str == CAMERA_READOUT_SPEED0_STR ) {
+    if ( currentRate == CAMERA_READOUT_SPEED0_STR ) {
         idx = 0;
-    } else if ( str == CAMERA_READOUT_SPEED1_STR ) {
+    } else if ( currentRate == CAMERA_READOUT_SPEED1_STR ) {
         idx = 1;
-    } else if ( str == CAMERA_READOUT_SPEED2_STR ) {
+    } else if ( currentRate == CAMERA_READOUT_SPEED2_STR ) {
         idx = 2;
     } else {
+        currentRate = CAMERA_READOUT_SPEED2_STR;
         idx = 2;
     }
 
@@ -490,6 +577,24 @@ void Camera::SetRate(const QString rate_str)
 
 void Camera::StartExposure(const QString &fits_filename, const QString &hdr_filename)
 {
+#ifdef QT_DEBUG
+    qDebug() << "[CAMERA] Start exposure! FITS file: " << fits_filename;
+#endif
+    if ( fits_filename.isEmpty() ) {
+#ifdef QT_DEBUG
+        qDebug() << "[CAMERA] StartExposure: empty FITS filename!";
+#endif
+        lastError = CAMERA_ERROR_FITS_FILENAME;
+        emit CameraError(lastError);
+        return;
+    }
+
+    currentFITS_Filename = fits_filename;
+    currentHDR_Filename = hdr_filename;
+
+    isStopped = false;
+    startExposureTime = QDateTime::currentDateTimeUtc();
+
 #ifdef EMULATOR_MODE
     currentStatus = DRV_ACQUIRING;
     lastError = DRV_SUCCESS;
@@ -497,11 +602,12 @@ void Camera::StartExposure(const QString &fits_filename, const QString &hdr_file
     ANDOR_API_CALL(StartAcquisition,);
 #endif
     if ( lastError == DRV_SUCCESS ) {
+        connect(statusPolling,SIGNAL(Camera_IDLE()),this,SLOT(SaveFITS()));
         statusPolling->start();
+        cameraStatus = CAMERA_STATUS_ACQUISITION_TEXT;
+        emit CameraStatus(cameraStatus);
+        exp_timer->start(CAMERA_TIMER_RESOLUTION*1000);
     }
-    cameraStatus = CAMERA_STATUS_ACQUISITION_TEXT;
-    emit CameraStatus(cameraStatus);
-    exp_timer->start(CAMERA_TIMER_RESOLUTION*1000);
 }
 
 
@@ -512,10 +618,13 @@ void Camera::StopExposure()
 #else
     ANDOR_API_CALL(AbortAcquisition,);
 #endif
+    isStopped = true;
     exp_timer->stop();
     statusPolling->stop();
-    currentExposureClock = 0.0;
-    emit ExposureClock(currentExposureClock);
+    statusPolling->disconnect();
+    emit ExposureClock(0.0);
+    cameraStatus = CAMERA_STATUS_ABORT_TEXT;
+    emit CameraStatus(cameraStatus);
 }
 
 
@@ -567,12 +676,184 @@ void Camera::SaveFITS()
     exp_timer->stop();
     emit ExposureClock(0.0);
 
-    int xsize, ysize;
+    statusPolling->disconnect();
 
-    LogOutput("   [CAMERA] Save FITS image");
-    ANDOR_API_CALL(GetDetector,&xsize,&ysize);
+    cameraStatus = CAMERA_STATUS_READING_TEXT;
+    emit CameraStatus(cameraStatus);
+
+    LogOutput("   [CAMERA] Reading image ...");
+
+    // allocate memory for image buffer
+    unsigned long buffer_size = currentImage_Xsize*currentImage_Ysize;
+
+    fitsfile* fptr = NULL;
+    int fits_status = 0;
+
+    try {
+        if ( currentImage_buffer != nullptr ) delete currentImage_buffer;
+#ifdef QT_DEBUG
+        qDebug() << "[CAMERA] Current image size: [" << currentImage_Xsize << ", " << currentImage_Ysize << "]";
+        qDebug() << "[CAMERA] Current start pixel: [" << currentImage_startX << ", " << currentImage_startY << "]";
+        qDebug() << "[CAMERA] Allocate buffer for " << buffer_size << " pixels";
+#endif
+        currentImage_buffer = new buffer_t[buffer_size];
+
+        ANDOR_API_CALL(GetAcquiredData16,currentImage_buffer,buffer_size);
+        if ( lastError != DRV_SUCCESS ) throw lastError;
+
+        cameraStatus = CAMERA_STATUS_SAVING_TEXT;
+        emit CameraStatus(cameraStatus);
+
+        LogOutput("   [CAMERA] Saving FITS image ...");
+
+        long naxis = 2; // According to the requirements specification the only 2-dim FITS images should be written
+        long naxes[2];
+        long start_x = currentImage_startX;
+        long start_y = currentImage_startY;
+
+        if ( currentFITS_Filename.isEmpty() ) {
+#ifdef QT_DEBUG
+            qDebug() << "[CAMERA] FITS filename is empty!";
+#endif
+            lastError = CAMERA_ERROR_FITS_FILENAME;
+            throw lastError;
+        }
+
+        QString filename = "!" + currentFITS_Filename; // add '!' to rewrite existing file (see CFITSIO library)
+
+        // first, try to open disk file ...
+        CFITSIO_API_CALL(fits_create_file,&fptr,filename.toUtf8().data(),&fits_status);
+
+        naxes[0] = currentImage_Xsize;
+        naxes[1] = currentImage_Ysize;
+
+        CFITSIO_API_CALL(fits_create_img,fptr,USHORT_IMG,naxis,naxes,&fits_status);
+
+        // write image to FITS file
+        long fpix[2] = {1,1};
+        LONGLONG nelems = naxes[0]*naxes[1];
+
+        CFITSIO_API_CALL(fits_write_pix,fptr,TUSHORT,fpix,nelems,currentImage_buffer,&fits_status);
+
+        delete currentImage_buffer;
+        currentImage_buffer = nullptr;
+
+        // write FITS header keywords
+        char str[FLEN_VALUE];
+        QByteArray arr;
+
+        // "DATE-OBS" and "DATE" FITS keywords in format required by FITS date/time format
+        arr = startExposureTime.toString("yyyy-MM-ddThh-mm-ss.zzz").toUtf8(); // in ISO format
+        CFITSIO_API_CALL(fits_update_key,fptr,TSTRING,"DATE-OBS",arr.data(),"Start of the exposure in UTC",&fits_status);
+
+        // "ORIGIN" FITS keyword
+#ifdef Q_OS_WIN
+        sprintf_s(str,"%s, v%d.%d",NEWTONCAM_PACKAGE_VERSION_STR,NEWTONCAM_PACKAGE_VERSION_MAJOR,NEWTONCAM_PACKAGE_VERSION_MINOR);
+#endif
+#ifdef Q_OS_LINUX
+        sprintf(str,"%s, v%d.%d",NEWTONCAM_PACKAGE_VERSION_STR,NEWTONCAM_PACKAGE_VERSION_MAJOR,NEWTONCAM_PACKAGE_VERSION_MINOR);
+#endif
+        CFITSIO_API_CALL(fits_update_key,fptr,TSTRING,"ORIGIN",str,"Acquisition system",&fits_status);
+
+        // "CRVALx" keywords
+        CFITSIO_API_CALL(fits_update_key,fptr,TLONG,"CRVAL1",&start_x,"Start X-coordinate in sensor pixels",&fits_status);
+        CFITSIO_API_CALL(fits_update_key,fptr,TLONG,"CRVAL2",&start_y,"Start Y-coordinate in sensor pixels",&fits_status);
+
+        // "EXPTIME" keyword
+        // if exposure wass stopped then save CurrentExposureClock variable instead of user-defined value
+        if ( !isStopped ) {
+            CFITSIO_API_CALL(fits_update_key,fptr,TDOUBLE,"EXPTIME",&currentExpTime,"Exposure time in seconds",&fits_status);
+        } else {
+            double real_exp = currentExpTime - currentExposureClock;
+            CFITSIO_API_CALL(fits_update_key,fptr,TDOUBLE,"EXPTIME",&real_exp,"Exposure time in seconds (aborted)",&fits_status);
+        }
+
+        // BINNING keyword
+#ifdef Q_OS_WIN
+        sprintf_s(str,"%dx%d",currentImage_binX,currentImage_binY);
+#endif
+#ifdef Q_OS_LINUX
+        sprintf(str,"%dx%d",currentImage_binX,currentImage_binY);
+#endif
+        CFITSIO_API_CALL(fits_update_key,fptr,TSTRING,"BINNING",str,"Binning (XBINxYBIN)",&fits_status);
 
 
+        // add camera info
+        CFITSIO_API_CALL(fits_update_key,fptr,TSTRING,"HEADMOD",headModel.toUtf8().data(),"Camera head model",&fits_status);
+        CFITSIO_API_CALL(fits_update_key,fptr,TSTRING,"DRIVER",driverVersion.toUtf8().data(),"Camera driver version",&fits_status);
+        start_x = serialNumber;
+        CFITSIO_API_CALL(fits_update_key,fptr,TLONG,"SERNUM",&start_x,"Camera serial number",&fits_status);
+        start_x = firmwareVersion;
+        CFITSIO_API_CALL(fits_update_key,fptr,TLONG,"FIRMVER",&start_x,"Camera firmware version",&fits_status);
+        start_x = firmwareBuild;
+        CFITSIO_API_CALL(fits_update_key,fptr,TLONG,"FIRMNUM",&start_x,"Camera firmware build number",&fits_status);
+
+
+        // temperature and cooler status
+        QString cooling_status_str;
+        tempMutex->lock();
+        CFITSIO_API_CALL(fits_update_key,fptr,TDOUBLE,"CCDTEMP",&currentTemperature,"CCD chip temperature in Celsius",&fits_status);
+        switch ( currentCoolerStatus ) {
+            case DRV_ACQUIRING: {
+                cooling_status_str = "ACQUIRING";
+                break;
+            }
+            case DRV_TEMP_OFF: {
+                cooling_status_str = "OFF";
+                break;
+            }
+            case DRV_TEMP_STABILIZED: {
+                cooling_status_str = "STABILIZED";
+                break;
+            }
+            case DRV_TEMP_NOT_REACHED: {
+                cooling_status_str = "NOT REACHED";
+                break;
+            }
+            case DRV_TEMP_DRIFT: {
+                cooling_status_str = "DRIFT";
+                break;
+            }
+            case DRV_TEMP_NOT_STABILIZED: {
+                cooling_status_str = "NOT STABILIZED";
+                break;
+            }
+            default: {
+                cooling_status_str = "UNKNOWN";
+                break;
+            }
+        }
+        tempMutex->unlock();
+        CFITSIO_API_CALL(fits_update_key,fptr,TSTRING,"COOLER",cooling_status_str.toUtf8().data(),"Cooler status",&fits_status);
+
+        // readout rate and gain
+        CFITSIO_API_CALL(fits_update_key,fptr,TSTRING,"RATE",currentRate.toUtf8().data(),"Readout rate",&fits_status);
+        CFITSIO_API_CALL(fits_update_key,fptr,TSTRING,"GAIN",currentGain.toUtf8().data(),"CCD gain",&fits_status);
+
+        // add user FITS keywords
+        if ( !currentHDR_Filename.isEmpty() ) {
+            CFITSIO_API_CALL(fits_write_key_template,fptr,currentHDR_Filename.toUtf8().data(),&fits_status);
+        }
+
+        CFITSIO_API_CALL(fits_close_file,fptr,&fits_status);
+
+        cameraStatus = CAMERA_STATUS_READY_TEXT;
+        emit CameraStatus(cameraStatus);
+    } catch (std::bad_alloc &ex) {
+        currentImage_buffer = nullptr;
+        lastError = Camera::CAMERA_ERROR_BADALLOC;
+        emit CameraError(lastError);
+    } catch (unsigned int &err) {
+#ifdef QT_DEBUG
+        qDebug() << "[CAMERA] Catching error: " << err;
+#endif
+        emit CameraError(lastError);
+        cameraStatus = CAMERA_STATUS_FAILURE_TEXT;
+        emit CameraStatus(cameraStatus);
+        delete currentImage_buffer;
+        currentImage_buffer = nullptr;
+        fits_close_file(fptr,&fits_status);
+    }
 }
 
             /*  private methods  */

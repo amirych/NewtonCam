@@ -315,7 +315,7 @@ void Server::ExecuteCommand()
     }
 
     StatusNetPacket server_status_packet;
-    unsigned int last_oper_status;
+//    unsigned int last_oper_status;
     bool ok;
 
     switch ( clientPacket->GetPacketID() ) {
@@ -355,31 +355,40 @@ void Server::ExecuteCommand()
         } else if ( command_name == NETPROTOCOL_COMMAND_INIT ) { // re-init camera
             InitCamera();
             server_status_packet.SetStatus(lastError,"");
-        } else if ( command_name == NETPROTOCOL_COMMAND_BINNING ) {
-            QVector<double> bin_vals;
-            QVector<int> bin_vals_int;
-            ok = pk->GetCmdArgs(&bin_vals);
-            if ( !ok ) {
-                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
-            } else {
-                DOUBLE_TO_INT(bin_vals,bin_vals_int);
-                server_status_packet.SetStatus(lastError,"");
-#ifdef QT_DEBUG
-            qDebug() << "SERVER: ARGS: " << bin_vals_int;
-#endif
-            }
-        } else if ( command_name == NETPROTOCOL_COMMAND_ROI ) {
-            QVector<double> roi_vals;
-            QVector<int> roi_vals_int;
+//        } else if ( command_name == NETPROTOCOL_COMMAND_BINNING ) {
+//            QVector<double> bin_vals;
+//            QVector<int> bin_vals_int;
+//            ok = pk->GetCmdArgs(&bin_vals);
+//            if ( !ok ) {
+//                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+//            } else {
+//                DOUBLE_TO_INT(bin_vals,bin_vals_int);
+//                server_status_packet.SetStatus(lastError,"");
+//            }
+//        } else if ( command_name == NETPROTOCOL_COMMAND_ROI ) {
+//            QVector<double> roi_vals;
+//            QVector<int> roi_vals_int;
 
-            ok = pk->GetCmdArgs(&roi_vals);
+//            ok = pk->GetCmdArgs(&roi_vals);
+//            if ( !ok ) {
+//                server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
+//            } else {
+//                DOUBLE_TO_INT(roi_vals,roi_vals_int);
+//                server_status_packet.SetStatus(lastError,"");
+//            }
+        } else if ( command_name == NETPROTOCOL_COMMAND_FRAME ) {
+            QVector<double> frame_vals;
+            QVector<int> frame_vals_int;
+
+            ok = pk->GetCmdArgs(&frame_vals);
             if ( !ok ) {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
             } else {
-                DOUBLE_TO_INT(roi_vals,roi_vals_int);
+                DOUBLE_TO_INT(frame_vals,frame_vals_int);
+                SetFrame(frame_vals_int[0],frame_vals_int[1],frame_vals_int[2],frame_vals_int[3],frame_vals_int[4],frame_vals_int[5]);
                 server_status_packet.SetStatus(lastError,"");
 #ifdef QT_DEBUG
-            qDebug() << "SERVER: ARGS: " << roi_vals_int;
+            qDebug() << "SERVER: ARGS: " << frame_vals_int;
 #endif
             }
         } else if ( command_name == NETPROTOCOL_COMMAND_GAIN ) {
@@ -488,6 +497,9 @@ void Server::ExecuteCommand()
             } else {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_OK,"OK");
             }
+        } else if ( command_name == NETPROTOCOL_COMMAND_START ) {
+            StartExposure(currentFITS_Filename,currentHDR_Filename);
+            server_status_packet.SetStatus(lastError,"");
         } else {
             server_status_packet.SetStatus(Server::SERVER_ERROR_UNKNOWN_COMMAND,"UNKNOWN COMMAND");
             qDebug() << "[[[" << server_status_packet.GetByteView() << "]]]";
@@ -578,8 +590,8 @@ bool Server::isListening() const
 
 void Server::SendServerState()
 {
-    double temp;
-    unsigned int cool_status;
+//    double temp;
+//    unsigned int cool_status;
 
 //    GetCCDTemperature(&temp,&cool_status);
 

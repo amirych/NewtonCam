@@ -8,6 +8,7 @@
 
 class StatusPollingThread : public QThread
 {
+    Q_OBJECT
 public:
     StatusPollingThread(Camera *cam, unsigned int poll_int = CAMERA_DEFAULT_STATUS_POLLING_INT);
 

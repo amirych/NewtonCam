@@ -77,14 +77,14 @@ int main(int argc, char *argv[])
     QCommandLineOption expOption(QStringList() << "e" << "exp", "Set exposure time",
                                  "time in secs");
 
-    QCommandLineOption binOption(QStringList() << "b" << "bin", "Set binning",
-                                 "binning string");
+//    QCommandLineOption binOption(QStringList() << "b" << "bin", "Set binning",
+//                                 "binning string");
 
     QCommandLineOption gainOption(QStringList() << "g" << "gain", "Set gain",
                                   "gain string");
 
-    QCommandLineOption roiOption(QStringList() << "f" << "frame", "Set readout region",
-                                      "geometry array");
+    QCommandLineOption frameOption(QStringList() << "f" << "frame", "Set frame (binning and readout region)",
+                                   "binning and geometry array");
 
     QCommandLineOption rateOption(QStringList() << "r" << "rate", "Set readout rate", "rate string");
 
@@ -111,9 +111,9 @@ int main(int argc, char *argv[])
     cmdline_parser.addOption(stopOption);
 
     cmdline_parser.addOption(expOption);
-    cmdline_parser.addOption(binOption);
+//    cmdline_parser.addOption(binOption);
     cmdline_parser.addOption(gainOption);
-    cmdline_parser.addOption(roiOption);
+    cmdline_parser.addOption(frameOption);
     cmdline_parser.addOption(rateOption);
     cmdline_parser.addOption(shutterOption);
     cmdline_parser.addOption(coolerOption);
@@ -138,31 +138,31 @@ int main(int argc, char *argv[])
     bool ok;
 
     // binning
-    QString bin_str = cmdline_parser.value(binOption);
-    QVector<double> bin_vals;
-    if ( !bin_str.isEmpty() ) {
-        QRegExp rx("\\s*\\d+x\\d+\\s*"); // binning string must be in format XBINxYBIN
-        ok = rx.exactMatch(bin_str);
-        if ( !ok ) {
-            qDebug() << "BAD BIN!";
-            return CLIENT_ERROR_INVALID_OPTION;
-        }
-        QStringList v = bin_str.split("x",QString::SkipEmptyParts);
-        bin_vals << v[0].toDouble() << v[1].toDouble();
-    }
+//    QString bin_str = cmdline_parser.value(binOption);
+//    QVector<double> bin_vals;
+//    if ( !bin_str.isEmpty() ) {
+//        QRegExp rx("\\s*\\d+x\\d+\\s*"); // binning string must be in format XBINxYBIN
+//        ok = rx.exactMatch(bin_str);
+//        if ( !ok ) {
+//            qDebug() << "BAD BIN!";
+//            return CLIENT_ERROR_INVALID_OPTION;
+//        }
+//        QStringList v = bin_str.split("x",QString::SkipEmptyParts);
+//        bin_vals << v[0].toDouble() << v[1].toDouble();
+//    }
 
-    // read-out region
-    QString roi_str = cmdline_parser.value(roiOption);
-    QVector<double> roi_vals;
-    if ( !roi_str.isEmpty() ) {
-        QRegExp rx("\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s*");
-        ok = rx.exactMatch(roi_str);
+    // frame option (binning and readout region)
+    QString frame_str = cmdline_parser.value(frameOption);
+    QVector<double> frame_vals;
+    if ( !frame_str.isEmpty() ) { // it should be "binX binY startX startY sizeX sizeY"
+        QRegExp rx("\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s*");
+        ok = rx.exactMatch(frame_str);
         if ( !ok ) {
             qDebug() << "BAD ROI!";
             return CLIENT_ERROR_INVALID_OPTION;
         }
-        QStringList v = roi_str.split(" ",QString::SkipEmptyParts);
-        for ( int i = 0; i < 4; ++i ) roi_vals << v[i].toDouble();
+        QStringList v = frame_str.split(" ",QString::SkipEmptyParts);
+        for ( int i = 0; i < 6; ++i ) frame_vals << v[i].toDouble();
     }
 
 
@@ -233,14 +233,14 @@ int main(int argc, char *argv[])
 
     QStringList pos_args = cmdline_parser.positionalArguments();
 
-    bool send_shutter = false;
+    bool send_start = false;
 
     if ( !pos_args.isEmpty() ) {
         QString str = pos_args[0].trimmed();
         if ( str.isEmpty() ) {
             return CLIENT_ERROR_INVALID_FITS_FILENAME;
         }
-        send_shutter = true;
+        send_start = true;
 
         if ( pos_args.length() > 1 ) {
             str = pos_args[1].trimmed();
@@ -308,13 +308,25 @@ int main(int argc, char *argv[])
     QString info_str;
     QTextStream info_stream(&info_str);
 
-    // --stop
+    // --stop (the application send this command and exit!!! it does not send any another commands!)
 
     if ( cmdline_parser.isSet(stopOption) ) {
         info_stream << NETPROTOCOL_COMMAND_STOP << " ";
         command_packet.SetCommand(NETPROTOCOL_COMMAND_STOP,"");
         SEND_COMMAND;
         SERVER_STATUS;
+
+        InfoNetPacket info_pk(info_str);
+        ok = info_pk.Send(&socket);
+        if ( !ok ) {
+            return CLIENT_ERROR_CONNECTION;
+        }
+
+        SERVER_STATUS;
+
+        socket.disconnect(); // disconnect all slots
+
+        return CLIENT_ERROR_OK;
     }
 
 
@@ -346,32 +358,34 @@ int main(int argc, char *argv[])
         QString cooling_status_str = "[]";
 
         switch (cooling_status) {
-        case DRV_ACQUIRING: {
-            cooling_status_str.insert(1,"ACQUIRING");
-            break;
-        }
-        case DRV_TEMP_OFF: {
-            cooling_status_str.insert(1,"OFF");
-            break;
-        }
-        case DRV_TEMP_STABILIZED: {
-            cooling_status_str.insert(1,"STABILIZED");
-            break;
-        }
-        case DRV_TEMP_NOT_REACHED: {
-            cooling_status_str.insert(1,"NOT REACHED");
-            break;
-        }
-        case DRV_TEMP_DRIFT: {
-            cooling_status_str.insert(1,"DRIFT");
-            break;
-        }
-        case DRV_TEMP_NOT_STABILIZED: {
-            cooling_status_str.insert(1,"NOT STABILIZED");
-            break;
-        }
-        default:
-            break;
+            case DRV_ACQUIRING: {
+                cooling_status_str.insert(1,"ACQUIRING");
+                break;
+            }
+            case DRV_TEMP_OFF: {
+                cooling_status_str.insert(1,"OFF");
+                break;
+            }
+            case DRV_TEMP_STABILIZED: {
+                cooling_status_str.insert(1,"STABILIZED");
+                break;
+            }
+            case DRV_TEMP_NOT_REACHED: {
+                cooling_status_str.insert(1,"NOT REACHED");
+                break;
+            }
+            case DRV_TEMP_DRIFT: {
+                cooling_status_str.insert(1,"DRIFT");
+                break;
+            }
+            case DRV_TEMP_NOT_STABILIZED: {
+                cooling_status_str.insert(1,"NOT STABILIZED");
+                break;
+            }
+            default: {
+                cooling_status_str.insert(1,"UNKNOWN");
+                break;
+            }
         }
 
         std::cout << ccd_temp << " " << cooling_status_str.toUtf8().data() << std::endl;
@@ -385,12 +399,12 @@ int main(int argc, char *argv[])
 
     // --bin (-b)
 
-    if ( cmdline_parser.value(binOption) != "" ) {
-        command_packet.SetCommand(NETPROTOCOL_COMMAND_BINNING,bin_vals);
-        info_stream << command_packet.GetPacketContent() << " ";
-        SEND_COMMAND;
-        SERVER_STATUS;
-    }
+//    if ( cmdline_parser.value(binOption) != "" ) {
+//        command_packet.SetCommand(NETPROTOCOL_COMMAND_BINNING,bin_vals);
+//        info_stream << command_packet.GetPacketContent() << " ";
+//        SEND_COMMAND;
+//        SERVER_STATUS;
+//    }
 
     // --rate (-r)
 
@@ -414,8 +428,8 @@ int main(int argc, char *argv[])
 
     // --frame (-f)
 
-    if ( cmdline_parser.value(roiOption) != "" ) {
-        command_packet.SetCommand(NETPROTOCOL_COMMAND_ROI,roi_vals);
+    if ( cmdline_parser.value(frameOption) != "" ) {
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_FRAME,frame_vals);
         info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
@@ -434,7 +448,7 @@ int main(int argc, char *argv[])
 
     // --shutter (-s)
 
-    if ( send_shutter ) { // if FITS-file is given then send SHUTTER-command
+    if ( send_start ) { // if FITS-file is given then send SHUTTER-command
         command_packet.SetCommand(NETPROTOCOL_COMMAND_SHUTTER, shutter_state == 0 ? 0.0 : 1.0);
         info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
@@ -487,6 +501,13 @@ int main(int argc, char *argv[])
         // user FITS-header file
         if ( pos_args.length() > 1 ) {
             command_packet.SetCommand(NETPROTOCOL_COMMAND_HEADFILE,pos_args[1]);
+            info_stream << command_packet.GetPacketContent() << " ";
+            SEND_COMMAND;
+            SERVER_STATUS;
+        }
+
+        if ( send_start ) { // send START command
+            command_packet.SetCommand(NETPROTOCOL_COMMAND_START,"");
             info_stream << command_packet.GetPacketContent() << " ";
             SEND_COMMAND;
             SERVER_STATUS;

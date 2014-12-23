@@ -35,12 +35,22 @@ void StatusPollingThread::run()
     }
 #else
     ret_status = GetStatus(&camera_status);
-    if ( ret_status != DRV_SUCCESS ) exit(ret_status);
+    if ( ret_status != DRV_SUCCESS ) {
+        camera->lastError = ret_status;
+        emit camera->CameraError(camera->lastError);
+        exit(ret_status);
+    }
 
     while ( (camera_status == DRV_ACQUIRING) && !stop_thread ) {
         ret_status = GetStatus(&camera_status);
-        if ( ret_status != DRV_SUCCESS ) exit(ret_status);
+        if ( ret_status != DRV_SUCCESS ){
+            camera->lastError = ret_status;
+            emit camera->CameraError(camera->lastError);
+            exit(ret_status);
+        }
         QThread::msleep(polling_interval);
     }
+
+    emit Camera_IDLE();
 #endif
 }
