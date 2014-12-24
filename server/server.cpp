@@ -319,6 +319,8 @@ void Server::ClientDisconnected()
 
 //    clientSocket = nullptr;
     newClientConnection = true;
+
+    emit CameraError(lastError); // emit signal with the last returned error code
 }
 
 
