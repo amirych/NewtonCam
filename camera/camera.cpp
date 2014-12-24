@@ -194,10 +194,6 @@ void Camera::InitCamera(QString init_path, long camera_index)
     LogOutput("   [CAMERA] Looking for connected Andor cameras ...");
 
     ANDOR_API_CALL(GetAvailableCameras,&no_cameras);
-//    lastError = GetAvailableCameras(&no_cameras);
-
-    qDebug() << "last err = " << lastError;
-    qDebug() << "edkedejdhekj";
 
 #ifdef QT_DEBUG
     qDebug() << "CAMERA: Number of found cameras: " << no_cameras;

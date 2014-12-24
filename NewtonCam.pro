@@ -7,7 +7,5 @@ SUBDIRS += \
     cam_caps \
     client \
     serverGUI \
-    test \
-    test_server \
     NewtonGUI \
     NewtonCam

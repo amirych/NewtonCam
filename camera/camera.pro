@@ -33,17 +33,26 @@ unix:!symbian {
     INSTALLS += target
 }
 
-#unix:!macx|win32: LIBS += -L$$PWD/../AndorSDK/ -landor
+#win32: LIBS += -L$$PWD/../AndorSDK -latmcd64m
+#unix:!macx: LIBS += -L$$PWD/../AndorSDK/ -landor
 
-win32: LIBS += -L$$PWD/../AndorSDK -latmcd64m
-unix:!macx: LIBS += -L$$PWD/../AndorSDK/ -landor
+#INCLUDEPATH += $$PWD/../AndorSDK
+#DEPENDPATH += $$PWD/../AndorSDK
 
-INCLUDEPATH += $$PWD/../AndorSDK
-DEPENDPATH += $$PWD/../AndorSDK
+include("../andor.pri")
 
-win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
-else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
-else:unix:!macx: LIBS += -L$$PWD/../cfitsio/ -lcfitsio
+#win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
 
-INCLUDEPATH += $$PWD/../cfitsio
-DEPENDPATH += $$PWD/../cfitsio
+#win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../cfitsio/x64/ -lcfitsio
+#else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../cfitsio/x64/ -lcfitsio
+#else:unix:!macx: LIBS += -L$$PWD/../cfitsio/ -lcfitsio
+
+#INCLUDEPATH += $$PWD/../cfitsio
+#DEPENDPATH += $$PWD/../cfitsio
+
+include("../cfitsio.pri")
+
+#message($$INCLUDEPATH)
+#contains(QMAKE_TARGET.arch, x86_64) {
+#    message("ZZZZ")
+#}

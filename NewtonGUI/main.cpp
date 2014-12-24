@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 
     QCommandLineParser cmdline_parser;
 
-    cmdline_parser.addHelpOption();
+//    cmdline_parser.addHelpOption();
 
     // create commandline options
 
@@ -99,6 +99,7 @@ int main(int argc, char *argv[])
     }
 
     NewtonGui ng(fontsize);
+    ng.SetFonts(fontsize,statusFontsize,logFontsize);
 //    QObject::connect(&ng,&NewtonGui::Error,[=](int err){exit(err);});
 
     a.processEvents(); // to draw the main window and show start message

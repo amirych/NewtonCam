@@ -121,7 +121,9 @@ ServerGUI::ServerGUI(QWidget *parent): ServerGUI(SERVERGUI_DEFAULT_FONTSIZE,pare
 
 ServerGUI::~ServerGUI()
 {
+#ifdef QT_DEBUG
     qDebug() << "ServerGUI is destroyed!";
+#endif
 }
 
 

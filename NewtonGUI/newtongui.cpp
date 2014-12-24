@@ -5,7 +5,7 @@
 #include <QString>
 #include <QFont>
 
-NewtonGui::NewtonGui(int fontsize): QWidget(), socket(nullptr)
+NewtonGui::NewtonGui(int fontsize): QWidget(), socket(nullptr), serverGUI(nullptr)
 {
     serverGUI = new ServerGUI(fontsize,this);
     serverGUI->show();
@@ -109,6 +109,11 @@ void NewtonGui::Connect(QHostAddress &server_addr, quint16 port)
     connect(socket,SIGNAL(readyRead()),pk_handler,SLOT(ReadDataStream()));
 }
 
+void NewtonGui::SetFonts(int fontsize, int status_fontsize, int log_fontsize)
+{
+    serverGUI->SetFonts(fontsize, status_fontsize, log_fontsize);
+    serverGUI->update();
+}
 
 
                             /*  Private slots  */

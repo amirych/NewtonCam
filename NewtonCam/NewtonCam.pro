@@ -41,11 +41,13 @@ else:unix:!macx: LIBS += -L$$OUT_PWD/../net_protocol/ -lnet_protocol
 INCLUDEPATH += $$PWD/../net_protocol
 DEPENDPATH += $$PWD/../net_protocol
 
-win32: LIBS += -L$$PWD/../AndorSDK -latmcd64m
-unix:!macx: LIBS += -L$$PWD/../AndorSDK/ -landor
+#win32: LIBS += -L$$PWD/../AndorSDK -latmcd64m
+#unix:!macx: LIBS += -L$$PWD/../AndorSDK/ -landor
 
-INCLUDEPATH += $$PWD/../AndorSDK
-DEPENDPATH += $$PWD/../AndorSDK
+#INCLUDEPATH += $$PWD/../AndorSDK
+#DEPENDPATH += $$PWD/../AndorSDK
+
+include("../andor.pri")
 
 win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../camera/release/ -lcamera
 else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../camera/debug/ -lcamera
@@ -54,9 +56,11 @@ else:unix:!macx: LIBS += -L$$OUT_PWD/../camera/ -lcamera
 INCLUDEPATH += $$PWD/../camera
 DEPENDPATH += $$PWD/../camera
 
-win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
-else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
-else:unix:!macx: LIBS += -L$$PWD/../cfitsio/ -lcfitsio
+#win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
+#else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../cfitsio/ -lcfitsio
+#else:unix:!macx: LIBS += -L$$PWD/../cfitsio/ -lcfitsio
 
-INCLUDEPATH += $$PWD/../cfitsio
-DEPENDPATH += $$PWD/../cfitsio
+#INCLUDEPATH += $$PWD/../cfitsio
+#DEPENDPATH += $$PWD/../cfitsio
+
+include("../cfitsio.pri")

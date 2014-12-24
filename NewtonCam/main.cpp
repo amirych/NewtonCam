@@ -276,7 +276,9 @@ int main(int argc, char *argv[])
 
     // log header
     if ( LogFile != nullptr ) {
-        char *sp = "            ";
+//        char *sp = "            ";
+        QString sps = "            ";
+        char *sp = sps.toUtf8().data();
         QString str1,str2;
         *LogFile << "\n\n\n";
         *LogFile << sp  << "***************************************************\n";

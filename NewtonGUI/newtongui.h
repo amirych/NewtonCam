@@ -29,6 +29,8 @@ public:
 
     void Connect(QHostAddress &server_addr, quint16 port = NETPROTOCOL_DEFAULT_PORT);
 
+    void SetFonts(int fontsize, int status_fontsize, int log_fontsize);
+
     ~NewtonGui();
 
 signals:
