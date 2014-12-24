@@ -93,6 +93,8 @@ int main(int argc, char *argv[])
                 exit(NEWTONGUI_ERROR_INVALID_HOSTNAME);
             }
             addr = info.addresses().first();
+        } else {
+            addr.setAddress(str);
         }
     }
 

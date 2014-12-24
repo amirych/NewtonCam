@@ -28,7 +28,7 @@ void NewtonGui::Connect(QHostAddress &server_addr, quint16 port)
 {
     QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
 
-    serverGUI->LogMessage("<b> " + str + ":</b> Trying to connect to NewtonCam server ...");
+    serverGUI->LogMessage("<b> " + str + ":</b> Trying to connect to NewtonCam server at " + server_addr.toString() + " ...");
 
 
     socket = new QTcpSocket(this);

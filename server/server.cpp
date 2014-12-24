@@ -178,15 +178,19 @@ void Server::ClientConnection()
     // who asked for connection. Receive HELLO message from client
     HelloNetPacket hello;
 
+    LogOutput("   [SERVER] Receiving HELLO message ... ", true, false);
     hello.Receive(socket,NetworkTimeout);
     if ( !hello.isPacketValid() ) {
+        LogOutput("Failed",false);
         lastSocketError = socket->error();
         emit ServerSocketError(lastSocketError);
         socket->disconnectFromHost();
         return;
     }
+    LogOutput("OK",false);
+
 #ifdef QT_DEBUG
-    qDebug() << "SERVER: received HELLO from client: " << hello.GetSenderType();
+    qDebug() << "[SERVER] received HELLO from client: " << hello.GetSenderType();
 #endif
 
     QString senderVersion;
@@ -201,17 +205,18 @@ void Server::ClientConnection()
     hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_SERVER,serverVersionString);
     ok = hello.Send(socket,NetworkTimeout);
     if ( !ok ) {
+        LogOutput("Failed",false);
         lastSocketError = socket->error();
         emit ServerSocketError(lastSocketError);
         socket->disconnectFromHost();
         return;
     }
+    LogOutput("OK",false);
 
 #ifdef QT_DEBUG
-    qDebug() << "SERVER: sent HELLO: " << hello.GetSenderType();
+    qDebug() << "[SERVER] sent HELLO: " << hello.GetSenderType();
 #endif
 
-    LogOutput("OK",false);
 
     QString hello_msg;
     server_status_packet.SetStatus(SERVER_ERROR_OK,"OK");
@@ -348,12 +353,21 @@ void Server::ExecuteCommand()
         QString command_name = pk->GetCmdName();
 
         // execute the command
+        QString time_stamp;
 
         if ( command_name == NETPROTOCOL_COMMAND_STOP ) {
             StopExposure();
             server_status_packet.SetStatus(lastError,"");
         } else if ( command_name == NETPROTOCOL_COMMAND_INIT ) { // re-init camera
             InitCamera();
+            time_stamp = "<b>";
+            time_stamp += TIME_STAMP;
+            time_stamp += "</b>";
+            if ( lastError != DRV_SUCCESS ) {
+                emit InfoIsReceived(time_stamp + "<font color='red'> Initialization process failed!</font>");
+            } else {
+                emit InfoIsReceived(time_stamp + " Initialization has been completed!");
+            }
             server_status_packet.SetStatus(lastError,"");
 //        } else if ( command_name == NETPROTOCOL_COMMAND_BINNING ) {
 //            QVector<double> bin_vals;

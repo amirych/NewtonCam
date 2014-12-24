@@ -312,6 +312,17 @@ int main(int argc, char *argv[])
 
     // It still rans in the main thread!!!
     CamServer.InitCamera(cameraInitPath,0);
+    QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss:");
+
+    if ( CamServer.GetLastError() != DRV_SUCCESS ) { // something was wrong!
+        if ( !cmdline_parser.isSet(noguiOption) ) {
+            serverGUI->LogMessage("<b>" + str + "</b>" + "<font color='red'> Initialization process failed!</font>");
+            app.processEvents();
+        }
+        std::cerr << "Initialization process failed!\n";
+    } else {
+        serverGUI->LogMessage("<b>" + str + "</b>" + " Initialization has been completed!");
+    }
 
     if ( !CamServer.isListening() ) {
         std::cerr << "Camera server failed to listening network socket!\n";

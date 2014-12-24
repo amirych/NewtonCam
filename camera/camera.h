@@ -73,7 +73,7 @@ class CAMERASHARED_EXPORT Camera: public QObject
     friend class TempPollingThread;
     friend class StatusPollingThread;
 public:
-    enum CameraErrorCode {CAMERA_ERROR_OK, CAMERA_ERROR_BADALLOC = 100, CAMERA_ERROR_FITS_FILENAME};
+    enum CameraErrorCode {CAMERA_ERROR_OK, CAMERA_ERROR_BADALLOC = 100, CAMERA_ERROR_FITS_FILENAME, CAMERA_ERROR_NO_DEVICE};
 
     explicit Camera(QObject *parent = 0);
     Camera(long camera_index, QObject *parent = 0);

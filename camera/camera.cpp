@@ -207,7 +207,7 @@ void Camera::InitCamera(QString init_path, long camera_index)
     LogOutput("   [CAMERA] EMULATOR_MODE: start emulation mode!");
 #else
     if ( !no_cameras ) { // camera is not detected!
-        if ( lastError == DRV_SUCCESS ) lastError = DRV_GENERAL_ERRORS; // NO GOOD IDEA!!!
+        if ( lastError == DRV_SUCCESS ) lastError = CAMERA_ERROR_NO_DEVICE;
         LogOutput("   [CAMERA] Cannot detect any cameras!");
         cameraStatus = CAMERA_STATUS_UNINITILIZED_TEXT;
         emit CameraStatus(cameraStatus);
