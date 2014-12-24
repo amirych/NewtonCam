@@ -23,9 +23,12 @@
 
 //#include <QtConcurrent/QtConcurrent>
 
-#define CAMERA_DEFAULT_LOG_FILENAME "NewtonCam.log"
-#define CAMERA_DEFAULT_INIT_PATH ""
+#define NEWTONCAM_DEFAULT_LOG_FILENAME "NewtonCam.log"
+#define NEWTONCAM_DEFAULT_INIT_PATH ""
 
+#define NEWTONCAM_INITIAL_CCD_TEMP     -10     // maximal allowed temperature for Newton CCD camera
+#define NEWTONCAM_INITIAL_COOLER_STATE "ON"    // initial cooler state
+#define NEWTONCAM_INITIAL_FAN_STATE    "FULL"  // initial fan state
 
 
                 /****************************************
@@ -106,6 +109,21 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     myApp = &app;
 
+            /*   Install OS signals handlers   */
+
+#ifdef Q_OS_UNIX
+    std::signal(SIGINT, signal_handler_int);
+    std::signal(SIGTERM, signal_handler_term);
+#endif
+
+#ifdef Q_OS_WIN
+    if( !SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) ) {
+#ifdef QT_DEBUG
+        qDebug() << "Can not install OS signal handler!";
+#endif
+    }
+#endif
+
             /*  commandline options definition  */
 
     QCommandLineParser cmdline_parser;
@@ -132,10 +150,15 @@ int main(int argc, char *argv[])
     int statusFontsize = SERVERGUI_DEFAULT_FONTSIZE-2;
     int logFontsize = SERVERGUI_DEFAULT_FONTSIZE;
 
-    QString cameraLogFilename = CAMERA_DEFAULT_LOG_FILENAME;
+    QString cameraLogFilename = NEWTONCAM_DEFAULT_LOG_FILENAME;
     unsigned long temp_poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT;
 
-    QString cameraInitPath = CAMERA_DEFAULT_INIT_PATH;
+    QString cameraInitPath = NEWTONCAM_DEFAULT_INIT_PATH;
+
+    int initial_CCDtemp = NEWTONCAM_INITIAL_CCD_TEMP;
+    QString initial_CoolerState = NEWTONCAM_INITIAL_COOLER_STATE;
+
+    QString initial_FanState = NEWTONCAM_INITIAL_FAN_STATE;
 
     bool ok;
 
@@ -188,14 +211,36 @@ int main(int argc, char *argv[])
 #ifdef QT_DEBUG
             qDebug() << "Allowed hosts from config: " << allowed_hosts;
 #endif
-            cameraInitPath = config.value("camera/init_path",CAMERA_DEFAULT_INIT_PATH).toString();
+            cameraInitPath = config.value("camera/init_path",NEWTONCAM_DEFAULT_INIT_PATH).toString();
 
-            cameraLogFilename = config.value("camera/log_file",CAMERA_DEFAULT_LOG_FILENAME).toString();
+            cameraLogFilename = config.value("camera/log_file",NEWTONCAM_DEFAULT_LOG_FILENAME).toString();
 
             temp_poll_int = config.value("camera/temp_poll_interval",CAMERA_DEFAULT_TEMP_POLLING_INT).toUInt(&ok);
             if ( !ok ) {
                 std::cerr << "Bad value of CCD chip temperature polling! Use of default value!\n";
                 temp_poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT;
+            }
+
+            double itemp = config.value("camera/init_temp",NEWTONCAM_INITIAL_CCD_TEMP).toDouble(&ok);
+            if ( !ok ) {
+                std::cerr << "Bad value of CCD chip initial temperature! Use of default value!\n";
+                initial_CCDtemp = NEWTONCAM_INITIAL_CCD_TEMP;
+            } else {
+                initial_CCDtemp = static_cast<int>(itemp);
+            }
+
+            initial_CoolerState = config.value("camera/init_cooler_state",NEWTONCAM_INITIAL_COOLER_STATE).toString();
+            initial_CoolerState = initial_CoolerState.trimmed().toUpper();
+            if ( (initial_CoolerState != "ON") && (initial_CoolerState != "OFF") ) {
+                std::cerr << "Bad value of initial cooler state! Use of default value!\n";
+                initial_CoolerState = NEWTONCAM_INITIAL_COOLER_STATE;
+            }
+
+            initial_FanState = config.value("camera/init_fan_state",NEWTONCAM_INITIAL_FAN_STATE).toString();
+            initial_FanState = initial_FanState.trimmed().toUpper();
+            if ( (initial_FanState != "OFF") && (initial_FanState != "LOW") && (initial_FanState != "FULL") ) {
+                std::cerr << "Bad value of initial fan state! Use of default value!\n";
+                initial_FanState = NEWTONCAM_INITIAL_FAN_STATE;
             }
 
         } else { // config file is given but not readable or cannot be found
@@ -297,6 +342,20 @@ int main(int argc, char *argv[])
         serverThread->start();
     }
 
+    QString str;
+
+    if ( !CamServer.isListening() ) {
+        std::cerr << "Camera server failed to start listening a network socket!\n";
+        if ( !cmdline_parser.isSet(noguiOption) ) {
+            str = "<b>" + QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss:") + "</b>";
+            serverGUI->ServerStatus(str + " Server failed to start listening a network socket!");
+            serverGUI->ServerStatus(str + " Server is not usefull and will be closed automatically after about 3 seconds!");
+            serverGUI->ServerStatus(str + " Check your OS network setup and restart NewtonCam!");
+        }
+        app.thread()->sleep(3);
+        exit(CamServer.getLastSocketError());
+    }
+
     // init path handling
     if ( cameraInitPath.isEmpty() || cameraInitPath.isNull() ) {
         cameraInitPath = QCoreApplication::applicationDirPath();
@@ -312,7 +371,7 @@ int main(int argc, char *argv[])
 
     // It still rans in the main thread!!!
     CamServer.InitCamera(cameraInitPath,0);
-    QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss:");
+    str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss:");
 
     if ( CamServer.GetLastError() != DRV_SUCCESS ) { // something was wrong!
         if ( !cmdline_parser.isSet(noguiOption) ) {
@@ -320,26 +379,22 @@ int main(int argc, char *argv[])
             app.processEvents();
         }
         std::cerr << "Initialization process failed!\n";
-    } else {
+    } else { // set initial CCD temperature and cooler state
         serverGUI->LogMessage("<b>" + str + "</b>" + " Initialization has been completed!");
+
+        CamServer.SetCCDTemperature(initial_CCDtemp);
+
+        if ( initial_CoolerState == "ON" ) {
+            CamServer.SetCoolerON();
+        } else if ( initial_CoolerState == "OFF" ) {
+            CamServer.SetCoolerOFF();
+        } else {
+            CamServer.SetCoolerOFF();
+        }
+
+        CamServer.SetFanState(initial_FanState);
     }
 
-    if ( !CamServer.isListening() ) {
-        std::cerr << "Camera server failed to listening network socket!\n";
-    }
-
-#ifdef Q_OS_UNIX
-    std::signal(SIGINT, signal_handler_int);
-    std::signal(SIGTERM, signal_handler_term);
-#endif
-
-#ifdef Q_OS_WIN
-    if( !SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) ) {
-#ifdef QT_DEBUG
-        qDebug() << "Can not install OS signal handler!";
-#endif
-    }
-#endif
 
     return app.exec();
 }

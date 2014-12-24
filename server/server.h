@@ -66,6 +66,7 @@ protected slots:
     void ExecuteCommand();
     void GUIDisconnected();
     void SendServerState();
+    void SendServerLog(QString log_str);
 
 protected:
     QTcpServer *net_server;

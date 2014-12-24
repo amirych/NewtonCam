@@ -150,9 +150,9 @@ void NetPacketHandler::ReadDataStream()
         break;
     }
 
-#ifdef QT_DEBUG
-    qDebug() << "PACKETHANDLER: received " << packet->GetByteView();
-#endif
+//#ifdef QT_DEBUG
+//    qDebug() << "PACKETHANDLER: received " << packet->GetByteView();
+//#endif
 
     packet = new NetPacket();
     newPacket = true;

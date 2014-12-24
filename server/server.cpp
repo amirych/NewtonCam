@@ -55,6 +55,8 @@ Server::Server(std::ostream &log_file, QList<QHostAddress> &hosts, quint16 port,
 
     if ( net_server == nullptr ) {
         LogOutput("   [SERVER] Cannot start server! Cannot create QTcpServer object!!!");
+        lastError = CAMERA_ERROR_BADALLOC;
+        emit CameraError(lastError);
         return;
     }
 
@@ -85,6 +87,8 @@ Server::Server(std::ostream &log_file, QList<QHostAddress> &hosts, quint16 port,
     connect(this,SIGNAL(CoolerStatusChanged(uint)),this,SLOT(SendServerState()));
     connect(this,SIGNAL(CameraError(uint)),this,SLOT(SendServerState()));
     connect(this,SIGNAL(CameraStatus(QString)),this,SLOT(SendServerState()));
+
+    connect(this,SIGNAL(InfoIsReceived(QString)),this,SLOT(SendServerLog(QString)));
 
     serverVersionString.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
     QString str;
@@ -189,6 +193,7 @@ void Server::ClientConnection()
     }
     LogOutput("OK",false);
 
+
 #ifdef QT_DEBUG
     qDebug() << "[SERVER] received HELLO from client: " << hello.GetSenderType();
 #endif
@@ -263,12 +268,18 @@ void Server::ClientConnection()
         hello_msg += TIME_STAMP;
         hello_msg += "</b>";
         hello_msg += "New NEWTON CLIENT connection from " + client_address.toString();
+        hello_msg += " (version: " + senderVersion + ")";
         emit HelloIsReceived(hello_msg);
 
         SEND_STATUS(socket); // send OK-status, i.e., server is ready for command acception
 
         newClientConnection = false;
         clientSocket = socket;
+
+        InfoNetPacket info;
+        info.SetInfo(hello_msg);
+
+        packetHandler->SendPacket(&info);
 
         packetHandler->SetSocket(clientSocket);
 
@@ -326,7 +337,11 @@ void Server::ExecuteCommand()
     switch ( clientPacket->GetPacketID() ) {
     case NetPacket::PACKET_ID_INFO: {
         InfoNetPacket *pk = static_cast<InfoNetPacket*>(clientPacket);
-        emit InfoIsReceived(pk->GetInfo());
+        QString str = "<b>";
+        str += TIME_STAMP;
+        str += "</b> " + pk->GetInfo();
+        emit InfoIsReceived(str);
+//        packetHandler->SendPacket(pk);
 
 #ifdef QT_DEBUG
         qDebug() << "SERVER: INFO-packet has been recieved [" << pk->GetInfo() << "]";
@@ -613,4 +628,12 @@ void Server::SendServerState()
     currentStatePacket.SetParams(lastError,currentTemperature,currentCoolerStatus,currentExposureClock,cameraStatus);
 
     emit UpdateRemoteGui(&currentStatePacket);
+}
+
+
+void Server::SendServerLog(QString log_str)
+{
+    InfoNetPacket pk;
+    pk.SetInfo(log_str);
+    packetHandler->SendPacket(&pk);
 }

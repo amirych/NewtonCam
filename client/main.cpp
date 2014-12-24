@@ -50,12 +50,14 @@ enum ClientError {CLIENT_ERROR_OK, CLIENT_ERROR_INVALID_OPTION = 10, CLIENT_ERRO
     if ( !server_status_packet.isPacketValid() ) { \
         qDebug() << "PACKET ERROR: " << server_status_packet.GetPacketError();\
         qDebug() << "BAD SERVER STATUS PACKET!"; \
+        socket.disconnect(); \
         exit(CLIENT_ERROR_CONNECTION); \
     } \
     status = server_status_packet.GetStatus(); \
     qDebug() << "<> SERVER RESPONDS: " << status; \
     if ( status != Server::SERVER_ERROR_OK ) {\
-        exit(status); \
+        socket.disconnect(); \
+        return status; \
     } \
 }
 
@@ -133,101 +135,14 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    /*  Parsing some command-line options  */
+    /*  Parsing some command-line options and form INFO message */
 
     bool ok;
+    QString info_str;
+    QTextStream info_stream(&info_str);
 
-    // binning
-//    QString bin_str = cmdline_parser.value(binOption);
-//    QVector<double> bin_vals;
-//    if ( !bin_str.isEmpty() ) {
-//        QRegExp rx("\\s*\\d+x\\d+\\s*"); // binning string must be in format XBINxYBIN
-//        ok = rx.exactMatch(bin_str);
-//        if ( !ok ) {
-//            qDebug() << "BAD BIN!";
-//            return CLIENT_ERROR_INVALID_OPTION;
-//        }
-//        QStringList v = bin_str.split("x",QString::SkipEmptyParts);
-//        bin_vals << v[0].toDouble() << v[1].toDouble();
-//    }
+    info_stream << "CMD: ";
 
-    // frame option (binning and readout region)
-    QString frame_str = cmdline_parser.value(frameOption);
-    QVector<double> frame_vals;
-    if ( !frame_str.isEmpty() ) { // it should be "binX binY startX startY sizeX sizeY"
-        QRegExp rx("\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s*");
-        ok = rx.exactMatch(frame_str);
-        if ( !ok ) {
-            qDebug() << "BAD ROI!";
-            return CLIENT_ERROR_INVALID_OPTION;
-        }
-        QStringList v = frame_str.split(" ",QString::SkipEmptyParts);
-        for ( int i = 0; i < 6; ++i ) frame_vals << v[i].toDouble();
-    }
-
-
-    // exposure time
-    QString exp_str = cmdline_parser.value(expOption);
-    double exp_time;
-    if ( !exp_str.isEmpty() ) {
-        exp_time = exp_str.toDouble(&ok);
-        if (!ok || (exp_time < 0.0) ){
-            qDebug() << "BAD EXP TIME!";
-            return CLIENT_ERROR_INVALID_OPTION;
-        }
-    }
-
-
-    // shutter state
-    QString shutter_str = cmdline_parser.value(shutterOption);
-    int shutter_state = shutter_str.toInt(&ok); // shutterOtion has default value, so do not check for empty string
-    if ( !ok ) {
-        qDebug() << "BAD SHUTTER STATE!";
-        return CLIENT_ERROR_INVALID_OPTION;
-    }
-
-    // cooler operation
-    QString cooler_str = cmdline_parser.value(coolerOption).toUpper().trimmed();
-    if ( !cooler_str.isEmpty() ) {
-        if ( (cooler_str != "ON") && (cooler_str != "OFF") ) {
-#ifdef QT_DEBUG
-            qDebug() << "BAD COOLER STATE VALUE! (" << cooler_str << ")";
-#endif
-            return CLIENT_ERROR_INVALID_OPTION;
-        }
-    }
-
-
-    // fan operation
-    QString fan_str = cmdline_parser.value(fanOption).toUpper().trimmed();
-    if ( !fan_str.isEmpty() ) {
-        if ( (fan_str != "FULL") && (fan_str != "LOW") && (fan_str != "OFF") ) {
-#ifdef QT_DEBUG
-            qDebug() << "BAD FAN STATE VALUE!";
-#endif
-            return CLIENT_ERROR_INVALID_OPTION;
-        }
-    }
-
-    // CCD temperature
-    QString temp_str = cmdline_parser.value(tempOption);
-    double ccd_temp;
-    if ( !temp_str.isEmpty() ) {
-        ccd_temp = temp_str.toDouble(&ok);
-        if ( !ok ) {
-            qDebug() << "BAD TEMPERATURE!";
-            return CLIENT_ERROR_INVALID_OPTION;
-        }
-    }
-
-    // server port
-    QString port_str = cmdline_parser.value(server_portOption);
-    QRegExp rx("\\s*\\d{1,}\\s*");
-    if ( !rx.exactMatch(port_str) ) {
-        qDebug() << "BAD PORT!";
-        return CLIENT_ERROR_INVALID_OPTION;
-    }
-    quint16 server_port = port_str.toULong();
 
     // check positional arguments (FITS and optional header files) if present
 
@@ -249,6 +164,131 @@ int main(int argc, char *argv[])
             }
         }
     }
+
+
+    // binning
+//    QString bin_str = cmdline_parser.value(binOption);
+//    QVector<double> bin_vals;
+//    if ( !bin_str.isEmpty() ) {
+//        QRegExp rx("\\s*\\d+x\\d+\\s*"); // binning string must be in format XBINxYBIN
+//        ok = rx.exactMatch(bin_str);
+//        if ( !ok ) {
+//            qDebug() << "BAD BIN!";
+//            return CLIENT_ERROR_INVALID_OPTION;
+//        }
+//        QStringList v = bin_str.split("x",QString::SkipEmptyParts);
+//        bin_vals << v[0].toDouble() << v[1].toDouble();
+//    }
+
+    // --stop
+    if ( cmdline_parser.isSet(stopOption) ) info_stream << NETPROTOCOL_COMMAND_STOP << " ";
+
+    // --init
+    if ( cmdline_parser.isSet(initOption) ) info_stream << NETPROTOCOL_COMMAND_INIT << " ";
+
+    // --gettemp
+    if ( cmdline_parser.isSet(gettempOption) ) info_stream << NETPROTOCOL_COMMAND_GETTEMP << " ";
+
+    // frame option (binning and readout region)
+    QString frame_str = cmdline_parser.value(frameOption);
+    QVector<double> frame_vals;
+    if ( !frame_str.isEmpty() ) { // it should be "binX binY startX startY sizeX sizeY"
+        QRegExp rx("\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s*");
+        ok = rx.exactMatch(frame_str);
+        if ( !ok ) {
+            qDebug() << "BAD ROI!";
+            return CLIENT_ERROR_INVALID_OPTION;
+        }
+        info_stream << NETPROTOCOL_COMMAND_FRAME << " ";
+        QStringList v = frame_str.split(" ",QString::SkipEmptyParts);
+        for ( int i = 0; i < 6; ++i ) {
+            frame_vals << v[i].toDouble();
+            info_stream << frame_vals[i] << " ";
+        }
+    }
+
+
+    // exposure time
+    QString exp_str = cmdline_parser.value(expOption);
+    double exp_time;
+    if ( !exp_str.isEmpty() ) {
+        exp_time = exp_str.toDouble(&ok);
+        if (!ok || (exp_time < 0.0) ){
+            qDebug() << "BAD EXP TIME!";
+            return CLIENT_ERROR_INVALID_OPTION;
+        }
+        info_stream << NETPROTOCOL_COMMAND_EXPTIME << " " << exp_time << " ";
+    }
+
+
+    // shutter state
+    QString shutter_str = cmdline_parser.value(shutterOption);
+    int shutter_state = shutter_str.toInt(&ok); // shutterOtion has default value, so do not check for empty string
+    if ( !ok ) {
+        qDebug() << "BAD SHUTTER STATE!";
+        return CLIENT_ERROR_INVALID_OPTION;
+    }
+    shutter_state = shutter_state == 0 ? 0 : 1;
+    if ( send_start ) {
+        info_stream << NETPROTOCOL_COMMAND_SHUTTER << " " << shutter_state << " ";
+    }
+
+    // cooler operation
+    QString cooler_str = cmdline_parser.value(coolerOption).toUpper().trimmed();
+    if ( !cooler_str.isEmpty() ) {
+        if ( (cooler_str != "ON") && (cooler_str != "OFF") ) {
+#ifdef QT_DEBUG
+            qDebug() << "BAD COOLER STATE VALUE! (" << cooler_str << ")";
+#endif
+            return CLIENT_ERROR_INVALID_OPTION;
+        }
+        info_stream << NETPROTOCOL_COMMAND_COOLER << " " << cooler_str << " ";
+    }
+
+
+    // fan operation
+    QString fan_str = cmdline_parser.value(fanOption).toUpper().trimmed();
+    if ( !fan_str.isEmpty() ) {
+        if ( (fan_str != "FULL") && (fan_str != "LOW") && (fan_str != "OFF") ) {
+#ifdef QT_DEBUG
+            qDebug() << "BAD FAN STATE VALUE!";
+#endif
+            return CLIENT_ERROR_INVALID_OPTION;
+        }
+        info_stream << NETPROTOCOL_COMMAND_FAN << " " << fan_str << " ";
+    }
+
+    if ( send_start ) {
+        info_stream << NETPROTOCOL_COMMAND_FITSFILE << " " << pos_args[0] << " ";
+        if ( pos_args.length() > 1 ) {
+            info_stream << NETPROTOCOL_COMMAND_HEADFILE << " " << pos_args[1] << " ";
+        }
+        info_stream << NETPROTOCOL_COMMAND_START << " ";
+    }
+
+    info_stream.flush();
+
+    // CCD temperature
+    QString temp_str = cmdline_parser.value(tempOption);
+    double ccd_temp;
+    if ( !temp_str.isEmpty() ) {
+        ccd_temp = temp_str.toDouble(&ok);
+        if ( !ok ) {
+            qDebug() << "BAD TEMPERATURE!";
+            return CLIENT_ERROR_INVALID_OPTION;
+        }
+        info_stream << NETPROTOCOL_COMMAND_SETTEMP << " " << ccd_temp << " ";
+    }
+
+    // server port
+    QString port_str = cmdline_parser.value(server_portOption);
+    QRegExp rx("\\s*\\d{1,}\\s*");
+    if ( !rx.exactMatch(port_str) ) {
+        qDebug() << "BAD PORT!";
+        return CLIENT_ERROR_INVALID_OPTION;
+    }
+    quint16 server_port = port_str.toULong();
+
 
                 /*  Try to connect to server  */
 
@@ -276,6 +316,7 @@ int main(int argc, char *argv[])
     clientVersion.setNum(NEWTONCAM_PACKAGE_VERSION_MAJOR);
     str.setNum(NEWTONCAM_PACKAGE_VERSION_MINOR);
     clientVersion += "." + str;
+    clientVersion.prepend("official client ");
 
     hello.SetSenderType(NETPROTOCOL_SENDER_TYPE_CLIENT,clientVersion);
     ok = hello.Send(&socket,NETPROTOCOL_TIMEOUT);
@@ -302,16 +343,24 @@ int main(int argc, char *argv[])
     // receive server answer ... It may be BUSY or OK
     SERVER_STATUS;
 
+    // send INFO message with commands
+    InfoNetPacket info_pk(info_str);
+    ok = info_pk.Send(&socket);
+    if ( !ok ) {
+        return CLIENT_ERROR_CONNECTION;
+    }
+
+    SERVER_STATUS;
+
+
                 /*  Send commands to server  */
 
     CmdNetPacket command_packet;
-    QString info_str;
-    QTextStream info_stream(&info_str);
 
     // --stop (the application send this command and exit!!! it does not send any another commands!)
 
     if ( cmdline_parser.isSet(stopOption) ) {
-        info_stream << NETPROTOCOL_COMMAND_STOP << " ";
+//        info_stream << NETPROTOCOL_COMMAND_STOP << " ";
         command_packet.SetCommand(NETPROTOCOL_COMMAND_STOP,"");
         SEND_COMMAND;
         SERVER_STATUS;
@@ -332,7 +381,7 @@ int main(int argc, char *argv[])
 
     // --init
     if ( cmdline_parser.isSet(initOption) ) {
-        info_stream << NETPROTOCOL_COMMAND_INIT << " ";
+//        info_stream << NETPROTOCOL_COMMAND_INIT << " ";
         command_packet.SetCommand(NETPROTOCOL_COMMAND_INIT,"");
         SEND_COMMAND;
         SERVER_STATUS;
@@ -341,7 +390,7 @@ int main(int argc, char *argv[])
     // --gettemp, it is a special command! The program receives a CCD temperature and cooler status, then exit!
 
     if ( cmdline_parser.isSet(gettempOption)) {
-        info_stream << NETPROTOCOL_COMMAND_GETTEMP << " ";
+//        info_stream << NETPROTOCOL_COMMAND_GETTEMP << " ";
         command_packet.SetCommand(NETPROTOCOL_COMMAND_GETTEMP,"");
         SEND_COMMAND;
         TempNetPacket pk;
@@ -410,7 +459,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(rateOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_RATE,cmdline_parser.value(rateOption));
-        info_stream << command_packet.GetPacketContent() << " ";
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -420,7 +469,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(gainOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_GAIN,cmdline_parser.value(gainOption));
-        info_stream << command_packet.GetPacketContent() << " ";
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -430,7 +479,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(frameOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_FRAME,frame_vals);
-        info_stream << command_packet.GetPacketContent() << " ";
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -440,7 +489,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(expOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_EXPTIME,exp_time);
-        info_stream << command_packet.GetPacketContent() << " ";
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -449,8 +498,8 @@ int main(int argc, char *argv[])
     // --shutter (-s)
 
     if ( send_start ) { // if FITS-file is given then send SHUTTER-command
-        command_packet.SetCommand(NETPROTOCOL_COMMAND_SHUTTER, shutter_state == 0 ? 0.0 : 1.0);
-        info_stream << command_packet.GetPacketContent() << " ";
+        command_packet.SetCommand(NETPROTOCOL_COMMAND_SHUTTER, shutter_state);
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -460,7 +509,7 @@ int main(int argc, char *argv[])
 
     if ( !cooler_str.isEmpty() ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_COOLER,cooler_str);
-        info_stream << command_packet.GetPacketContent() << " ";
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -471,7 +520,7 @@ int main(int argc, char *argv[])
     if ( !fan_str.isEmpty() ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_FAN,fan_str);
 //        qDebug() << "FAN: " << command_packet.GetByteView();
-        info_stream << command_packet.GetPacketContent() << " ";
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -481,7 +530,7 @@ int main(int argc, char *argv[])
 
     if ( cmdline_parser.value(tempOption) != "" ) {
         command_packet.SetCommand(NETPROTOCOL_COMMAND_SETTEMP,ccd_temp);
-        info_stream << command_packet.GetPacketContent() << " ";
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
     }
@@ -494,36 +543,26 @@ int main(int argc, char *argv[])
     if ( !pos_args.isEmpty() ) {
         // result FITS-file name
         command_packet.SetCommand(NETPROTOCOL_COMMAND_FITSFILE,pos_args[0]);
-        info_stream << command_packet.GetPacketContent() << " ";
+//        info_stream << command_packet.GetPacketContent() << " ";
         SEND_COMMAND;
         SERVER_STATUS;
 
         // user FITS-header file
         if ( pos_args.length() > 1 ) {
             command_packet.SetCommand(NETPROTOCOL_COMMAND_HEADFILE,pos_args[1]);
-            info_stream << command_packet.GetPacketContent() << " ";
+//            info_stream << command_packet.GetPacketContent() << " ";
             SEND_COMMAND;
             SERVER_STATUS;
         }
 
         if ( send_start ) { // send START command
             command_packet.SetCommand(NETPROTOCOL_COMMAND_START,"");
-            info_stream << command_packet.GetPacketContent() << " ";
+//            info_stream << command_packet.GetPacketContent() << " ";
             SEND_COMMAND;
             SERVER_STATUS;
         }
     }
 
-
-    info_stream.flush();
-
-    InfoNetPacket info_pk(info_str);
-    ok = info_pk.Send(&socket);
-    if ( !ok ) {
-        return CLIENT_ERROR_CONNECTION;
-    }
-
-    SERVER_STATUS;
 
     socket.disconnect(); // disconnect all slots
 

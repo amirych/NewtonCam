@@ -225,13 +225,10 @@ void Camera::InitCamera(QString init_path, long camera_index)
     ANDOR_API_CALL(Initialize,path);
 
     if ( lastError != DRV_SUCCESS ) {
-        LogOutput("  Failed!",false);
         cameraStatus = CAMERA_STATUS_UNINITILIZED_TEXT;
         emit CameraStatus(cameraStatus);
         emit CameraError(lastError);
         return;
-    } else {
-        LogOutput("  OK!",false);
     }
 
     cameraStatus = CAMERA_STATUS_INIT_TEXT;
