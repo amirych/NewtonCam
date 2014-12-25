@@ -64,3 +64,6 @@ DEPENDPATH += $$PWD/../camera
 #DEPENDPATH += $$PWD/../cfitsio
 
 include("../cfitsio.pri")
+
+DISTFILES += \
+    ../NewtonCam.ini
