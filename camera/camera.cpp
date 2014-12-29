@@ -98,7 +98,9 @@ Camera::Camera(std::ostream &log_file, long camera_index, QObject *parent):
     currentRate(""), currentGain(""),
     currentImage_buffer(nullptr),
     startExposureTime(QDateTime()),
-    isStopped(false)
+    isStopped(false),
+    shutterTTL_signal(CAMERA_DEFAULT_SHUTTER_TTL_SIGNAL), shutterMode(CAMERA_DEFAULT_SHUTTER_MODE),
+    shutterClosingTime(CAMERA_DEFAULT_SHUTTER_CLOSINGTIME), shutterOpeningTime(CAMERA_DEFAULT_SHUTTER_OPENINGTIME)
 {
 #ifdef QT_DEBUG
     qDebug() << "Create Camera";
@@ -313,6 +315,10 @@ void Camera::InitCamera(QString init_path, long camera_index)
     // set initial gain factor
 
     SetCCDGain(CAMERA_GAIN2_STR);
+
+    // set shutter control parameters (default values of parameters were initialized in constructor!)
+
+    ShutterControl(shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime);
 
     // get current CCD chip temperature and cooler status
 
@@ -620,6 +626,54 @@ void Camera::StopExposure()
     emit CameraStatus(cameraStatus);
 }
 
+
+void Camera::ShutterControl(int TTL_signal, int mode, int ctime, int otime)
+{
+    switch ( TTL_signal) {
+        case 0:
+        case 1: {
+            shutterTTL_signal = TTL_signal;
+            break;
+        }
+        default: {
+            shutterTTL_signal = CAMERA_DEFAULT_SHUTTER_TTL_SIGNAL;
+        }
+    }
+
+    switch ( mode ) {
+        case 0:
+        case 1:
+        case 2: {
+            shutterMode = mode;
+            break;
+        }
+        default: {
+            shutterMode = CAMERA_DEFAULT_SHUTTER_MODE;
+        }
+    }
+
+    if ( ctime < 0 ) shutterClosingTime = CAMERA_DEFAULT_SHUTTER_CLOSINGTIME; else shutterClosingTime = ctime;
+    if ( otime < 0 ) shutterOpeningTime = CAMERA_DEFAULT_SHUTTER_OPENINGTIME; else shutterOpeningTime = otime;
+
+    ANDOR_API_CALL(SetShutter,shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime);
+}
+
+
+void Camera::ShutterMode(int mode)
+{
+    switch ( mode ) {
+        case 0:
+        case 1:
+        case 2: {
+            shutterMode = mode;
+            break;
+        }
+        default: {
+            shutterMode = CAMERA_DEFAULT_SHUTTER_MODE;
+        }
+    }
+    ANDOR_API_CALL(SetShutter,shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime);
+}
 
 
             /*  protected methods  */

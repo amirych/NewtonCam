@@ -376,6 +376,8 @@ void Server::ExecuteCommand()
             StopExposure();
             server_status_packet.SetStatus(lastError,"");
         } else if ( command_name == NETPROTOCOL_COMMAND_INIT ) { // re-init camera
+            // first reset socket
+            packetHandler->Reset();
             InitCamera();
             time_stamp = "<b>";
             time_stamp += TIME_STAMP;
@@ -471,6 +473,7 @@ void Server::ExecuteCommand()
             if ( !ok ) {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
             } else {
+                ShutterMode(flag);
                 server_status_packet.SetStatus(lastError,"");
             }
         } else if ( command_name == NETPROTOCOL_COMMAND_EXPTIME ) {

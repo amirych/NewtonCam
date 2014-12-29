@@ -160,6 +160,12 @@ int main(int argc, char *argv[])
 
     QString initial_FanState = NEWTONCAM_INITIAL_FAN_STATE;
 
+    int shutterTTL_signal = CAMERA_DEFAULT_SHUTTER_TTL_SIGNAL;
+    int shutterClosingTime = CAMERA_DEFAULT_SHUTTER_CLOSINGTIME;
+    int shutterOpeningTime = CAMERA_DEFAULT_SHUTTER_OPENINGTIME;
+
+
+
     bool ok;
 
     if ( !pos_arg.isEmpty() && QFile::exists(pos_arg[0]) ) {
@@ -241,6 +247,24 @@ int main(int argc, char *argv[])
             if ( (initial_FanState != "OFF") && (initial_FanState != "LOW") && (initial_FanState != "FULL") ) {
                 std::cerr << "Bad value of initial fan state! Use of default value!\n";
                 initial_FanState = NEWTONCAM_INITIAL_FAN_STATE;
+            }
+
+            shutterTTL_signal = config.value("camera/shutter_ttl",CAMERA_DEFAULT_SHUTTER_TTL_SIGNAL).toInt(&ok);
+            if ( !ok ) {
+                std::cerr << "Bad value of shutter TTL open signal!! Use of default value!\n";
+                shutterTTL_signal = CAMERA_DEFAULT_SHUTTER_TTL_SIGNAL;
+            }
+
+            shutterClosingTime = config.value("camera/shutter_ctime",CAMERA_DEFAULT_SHUTTER_CLOSINGTIME).toInt(&ok);
+            if ( !ok || (shutterClosingTime < 0) ) {
+                std::cerr << "Bad value of shutter closing time!! Use of default value!\n";
+                shutterClosingTime = CAMERA_DEFAULT_SHUTTER_CLOSINGTIME;
+            }
+
+            shutterOpeningTime = config.value("camera/shutter_otime",CAMERA_DEFAULT_SHUTTER_OPENINGTIME).toInt(&ok);
+            if ( !ok || (shutterOpeningTime < 0) ) {
+                std::cerr << "Bad value of shutter opening time!! Use of default value!\n";
+                shutterOpeningTime = CAMERA_DEFAULT_SHUTTER_OPENINGTIME;
             }
 
         } else { // config file is given but not readable or cannot be found
@@ -395,6 +419,8 @@ int main(int argc, char *argv[])
         }
 
         CamServer.SetFanState(initial_FanState);
+
+        CamServer.ShutterControl(shutterTTL_signal,CAMERA_DEFAULT_SHUTTER_MODE,shutterClosingTime,shutterOpeningTime);
     }
 
 

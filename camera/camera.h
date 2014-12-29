@@ -58,6 +58,13 @@
 #define CAMERA_GAIN1_STR "NORM"  // API index 1
 #define CAMERA_GAIN2_STR "HIGH"  // API index 2
 
+
+            /*   Default shutter control parameters   */
+#define CAMERA_DEFAULT_SHUTTER_CLOSINGTIME 100 // shutter closing time in millisecs
+#define CAMERA_DEFAULT_SHUTTER_OPENINGTIME 100 // shutter opening time in millisecs
+#define CAMERA_DEFAULT_SHUTTER_TTL_SIGNAL  1   // output TTL signal to open shutter (1 - high, 0 - low)
+#define CAMERA_DEFAULT_SHUTTER_MODE 0          // shutter mode (0 - Auto, 1 - OPen, 2 - Close)
+
 // current time point macro. It returns a char* string
 #define TIME_STAMP QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss: ").toUtf8().data()
 
@@ -118,6 +125,7 @@ public:
 
     // shutter control
 
+    void ShutterControl(int TTL_signal, int mode, int ctime, int otime);
     void ShutterOpen();
     void ShutterClose();
 
@@ -190,6 +198,11 @@ protected:
     buffer_t *currentImage_buffer;
 
     QDateTime startExposureTime;
+
+    int shutterTTL_signal;
+    int shutterMode;
+    int shutterClosingTime;
+    int shutterOpeningTime;
 
     void LogOutput(QString log_str, bool time_stamp = true, bool new_line = true);
     void LogOutput(QStringList &log_strs);
