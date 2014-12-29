@@ -146,7 +146,7 @@ void ServerGUI::SetFonts(int fontsize, int status_fontsize, int log_fontsize)
 
     log_window->setFixedWidth(statusBarWidth());
 
-    this->repaint();
+    this->update();
 }
 
 

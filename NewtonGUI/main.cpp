@@ -11,6 +11,7 @@
 #include <QString>
 #include <QStringList>
 #include <QRegExp>
+#include <QDateTime>
 
 int main(int argc, char *argv[])
 {
@@ -100,7 +101,11 @@ int main(int argc, char *argv[])
 
     NewtonGui ng(fontsize);
     ng.SetFonts(fontsize,statusFontsize,logFontsize);
+    ng.show();
 //    QObject::connect(&ng,&NewtonGui::Error,[=](int err){exit(err);});
+
+    str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss");
+    ng.LogMessage("<b> " + str + ":</b> Trying to connect to NewtonCam server at " + addr.toString() + " ...");
 
     a.processEvents(); // to draw the main window and show start message
 

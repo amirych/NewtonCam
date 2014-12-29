@@ -11,6 +11,7 @@
 #include <QTcpSocket>
 #include <QHostAddress>
 #include <QMessageBox>
+#include <QThread>
 
 
 #define NEWTONGUI_ERROR_INVALID_PORT 10
@@ -20,7 +21,8 @@
 #define NEWTONGUI_ERROR_INVALID_FONTSIZE 14
 #define NEWTONGUI_ERROR_INVALID_HOSTNAME 15
 
-class NewtonGui: public QWidget
+//class NewtonGui: public QWidget
+class NewtonGui: public ServerGUI
 {
     Q_OBJECT
 
@@ -29,7 +31,7 @@ public:
 
     void Connect(QHostAddress &server_addr, quint16 port = NETPROTOCOL_DEFAULT_PORT);
 
-    void SetFonts(int fontsize, int status_fontsize, int log_fontsize);
+//    void SetFonts(int fontsize, int status_fontsize, int log_fontsize);
 
     ~NewtonGui();
 
@@ -43,8 +45,9 @@ private slots:
 private:
     QTcpSocket* socket;
     NetPacketHandler* pk_handler;
+    QThread *pk_handler_thread;
 
-    ServerGUI* serverGUI;
+//    ServerGUI* serverGUI;
 };
 
 #endif // NEWTONGUI_H
