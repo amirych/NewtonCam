@@ -465,6 +465,7 @@ void Server::ExecuteCommand()
             server_status_packet.SetStatus(lastError,"");
         } else if ( command_name == NETPROTOCOL_COMMAND_SHUTTER ) {
             double flag;
+            bool shutter_open = true;
 
             ok = pk->GetCmdArgs(&flag);
 #ifdef QT_DEBUG
@@ -473,6 +474,7 @@ void Server::ExecuteCommand()
             if ( !ok ) {
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
             } else {
+                if ( flag == 0.0 ) shutter_open = false;
                 ShutterMode(flag);
                 server_status_packet.SetStatus(lastError,"");
             }

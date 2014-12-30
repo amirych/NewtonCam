@@ -676,6 +676,16 @@ void Camera::ShutterMode(int mode)
 }
 
 
+void Camera::ShutterOpen(bool flag)
+{
+    if ( flag ) {
+        shutterMode = 0; // Auto mode
+    } else {
+        shutterMode = 2; // Close mode
+    }
+    ANDOR_API_CALL(SetShutter,shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime);
+}
+
             /*  protected methods  */
 
 void Camera::LogOutput(QString log_str, bool time_stamp, bool new_line)

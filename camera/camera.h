@@ -126,8 +126,8 @@ public:
     // shutter control
 
     void ShutterControl(int TTL_signal, int mode, int ctime, int otime);
-    void ShutterOpen();
-    void ShutterClose();
+    void ShutterMode(int mode);
+    void ShutterOpen(bool flag);
 
 signals:
     void CameraStatus(QString status);

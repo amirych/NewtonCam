@@ -8,7 +8,7 @@ QT       += core network
 
 QT       -= gui
 
-TARGET = client
+TARGET = NewtonCam_client
 CONFIG   += console
 CONFIG   -= app_bundle
 

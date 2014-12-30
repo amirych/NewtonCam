@@ -295,6 +295,9 @@ int main(int argc, char *argv[])
     QString server_ip = cmdline_parser.value(server_ipOption);
     QTcpSocket socket;
 
+#ifdef QT_DEBUG
+    qDebug() << "Trying to connect to server at " << server_ip << " ...";
+#endif
     socket.connectToHost(server_ip,server_port);
     if ( !socket.waitForConnected(NETPROTOCOL_TIMEOUT) ) {
         std::cerr << "Can not connect to server at " << server_ip.toUtf8().data()
@@ -302,6 +305,9 @@ int main(int argc, char *argv[])
         return CLIENT_ERROR_CONNECTION;
     }
 
+#ifdef QT_DEBUG
+    qDebug() << "OK";
+#endif
     QObject::connect(&socket,&QTcpSocket::disconnected,[=](){exit(CLIENT_ERROR_CONNECTION);});
 
                 /*   Hand-shaking    */
