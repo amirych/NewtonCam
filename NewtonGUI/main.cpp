@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
         if ( !rx.exactMatch(str) ) { // do DNS look-up
             QHostInfo info = QHostInfo::fromName(str.trimmed());
             if ( info.addresses().isEmpty() ) {
-                QMessageBox::critical(0,"Error","Invalid server hotname!");
+                QMessageBox::critical(0,"Error","Invalid server hostname!");
                 exit(NEWTONGUI_ERROR_INVALID_HOSTNAME);
             }
             addr = info.addresses().first();

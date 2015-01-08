@@ -314,6 +314,7 @@ int main(int argc, char *argv[])
         str1 += "." + str2;
         str2 = "* Version:                                        *\n";
         str2.replace(11,str1.length(),str1);
+        sp = sps.toUtf8().data();
         *LogFile << sp  << str2.toUtf8().data();
 
         char sdk_ver[100];
