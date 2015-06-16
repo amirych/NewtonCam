@@ -19,6 +19,9 @@ SOURCES += main.cpp \
 HEADERS  += \
     newtongui.h
 
+RC_ICONS = ../andor.ico
+
+
 win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../serverGUI/release/ -lserverGUI
 else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../serverGUI/debug/ -lserverGUI
 else:unix:!macx: LIBS += -L$$OUT_PWD/../serverGUI/ -lserverGUI

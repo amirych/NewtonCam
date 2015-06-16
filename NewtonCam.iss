@@ -40,6 +40,7 @@ Source: "..\NewtonCam.build-x86\client\release\NewtonCam_client.exe"; DestDir: "
 
 Source: "doc\NewtonCam.pdf"; DestDir: "{app}\doc"; Components: Docs
 
+Source: "ext_libs\qwindows.dll"; DestDir: "{app}\platforms"; Components: QT
 Source: "ext_libs\Qt5Core.dll"; DestDir: "{app}"; Components: QT
 Source: "ext_libs\Qt5Gui.dll"; DestDir: "{app}"; Components: QT
 Source: "ext_libs\Qt5Network.dll"; DestDir: "{app}"; Components: QT

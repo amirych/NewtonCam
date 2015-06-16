@@ -656,6 +656,7 @@ void Camera::ShutterControl(int TTL_signal, int mode, int ctime, int otime)
     if ( otime < 0 ) shutterOpeningTime = CAMERA_DEFAULT_SHUTTER_OPENINGTIME; else shutterOpeningTime = otime;
 
     ANDOR_API_CALL(SetShutter,shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime);
+//    ANDOR_API_CALL(SetShutterEx,shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime,shutterMode);
 }
 
 
@@ -673,6 +674,7 @@ void Camera::ShutterMode(int mode)
         }
     }
     ANDOR_API_CALL(SetShutter,shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime);
+//    ANDOR_API_CALL(SetShutter,shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime,shuterMode);
 }
 
 
@@ -681,7 +683,7 @@ void Camera::ShutterOpen(bool flag)
     if ( flag ) {
         shutterMode = 0; // Auto mode
     } else {
-        shutterMode = 2; // Close mode
+        shutterMode = 2; // Close mode (it means shutter is always closed)
     }
     ANDOR_API_CALL(SetShutter,shutterTTL_signal,shutterMode,shutterClosingTime,shutterOpeningTime);
 }

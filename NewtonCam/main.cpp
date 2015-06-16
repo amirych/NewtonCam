@@ -17,6 +17,7 @@
 #include <QRegExp>
 #include <QObject>
 #include <QThread>
+#include <QPoint>
 #include <iostream>
 #include <fstream>
 #include <csignal>
@@ -150,6 +151,11 @@ int main(int argc, char *argv[])
     int statusFontsize = SERVERGUI_DEFAULT_FONTSIZE-2;
     int logFontsize = SERVERGUI_DEFAULT_FONTSIZE;
 
+    int xpos;
+    int ypos;
+    bool isX = false;
+    bool isY = false;
+
     QString cameraLogFilename = NEWTONCAM_DEFAULT_LOG_FILENAME;
     unsigned long temp_poll_int = CAMERA_DEFAULT_TEMP_POLLING_INT;
 
@@ -194,6 +200,24 @@ int main(int argc, char *argv[])
             if ( !ok ) {
                 std::cerr << "Bad value of server log window font size! Use of default value!\n";
                 logFontsize = fontsize;
+            }
+
+            if ( config.contains("servergui/xpos") ) {
+                xpos = config.value("servergui/xpos").toInt(&ok);
+                if ( !ok ) {
+                    std::cerr << "Bad value of server window x-coordinate! Use of OS defaults!\n";
+                } else {
+                    isX = true;
+                }
+            }
+
+            if ( config.contains("servergui/ypos") ) {
+                ypos = config.value("servergui/ypos").toInt(&ok);
+                if ( !ok ) {
+                    std::cerr << "Bad value of server window y-coordinate! Use of OS defaults!\n";
+                } else {
+                    isY = true;
+                }
             }
 
             server_port = config.value("network/port",NETPROTOCOL_DEFAULT_PORT).toUInt(&ok);
@@ -348,9 +372,17 @@ int main(int argc, char *argv[])
 //        QObject::connect(&app,SIGNAL(aboutToQuit()),serverThread,SLOT(quit()));
         QObject::connect(&app,&QCoreApplication::aboutToQuit,[=](){shutdownApp();});
 
-        serverGUI = new ServerGUI(&root_widget);
+//        serverGUI = new ServerGUI(&root_widget);
+        serverGUI = new ServerGUI();
 
         serverGUI->SetFonts(fontsize,statusFontsize,logFontsize);
+
+        QPoint win_pos = serverGUI->pos();
+        if ( isX ) win_pos.setX(xpos);
+        if ( isY ) win_pos.setY(ypos);
+
+        if ( isX || isY ) serverGUI->move(win_pos);
+
         serverGUI->show();
 
         QString str = QDateTime::currentDateTime().toString(" dd-MM-yyyy hh:mm:ss:");

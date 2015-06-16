@@ -12,13 +12,18 @@ QMAKE_CXXFLAGS += -std=c++11
 
 
 TARGET = NewtonCam_server
-CONFIG   += console
+
+win32:CONFIG(debug, debug|release): CONFIG   += console
+
+
 #CONFIG   -= app_bundle
 
 TEMPLATE = app
 
 
 SOURCES += main.cpp
+
+RC_ICONS = ../andor.ico
 
 win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../server/release/ -lserver
 else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../server/debug/ -lserver

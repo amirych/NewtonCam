@@ -12,6 +12,7 @@
 #include <QStringList>
 #include <QRegExp>
 #include <QDateTime>
+#include <QPoint>
 
 int main(int argc, char *argv[])
 {
@@ -39,10 +40,16 @@ int main(int argc, char *argv[])
     str.setNum(SERVERGUI_DEFAULT_FONTSIZE);
     QCommandLineOption logfontOption(QStringList() << "l" << "logfontsize", "GUI log window font size", "numeric value", str);
 
+    QCommandLineOption xcoordOption(QStringList() << "x" << "xpos", "GUI window x-coordinate position", "numeric vlue", str);
+
+    QCommandLineOption ycoordOption(QStringList() << "y" << "ypos", "GUI window x-coordinate position", "numeric vlue", str);
+
     cmdline_parser.addOption(portOption);
     cmdline_parser.addOption(fontOption);
     cmdline_parser.addOption(statusfontOption);
     cmdline_parser.addOption(logfontOption);
+    cmdline_parser.addOption(xcoordOption);
+    cmdline_parser.addOption(ycoordOption);
 
     cmdline_parser.addPositionalArgument("IP-address", "NewtonCam server address (default 127.0.0.1)");
 
@@ -78,6 +85,28 @@ int main(int argc, char *argv[])
         exit(NEWTONGUI_ERROR_INVALID_FONTSIZE);
     }
 
+    int xcoord;
+    bool isX = false;
+    if ( !cmdline_parser.value(xcoordOption).isEmpty() ) {
+        xcoord = cmdline_parser.value(xcoordOption).toInt(&ok);
+        if ( !ok ) {
+            QMessageBox::critical(0,"Error","Invalid x-coordinate of GUI window!");
+            exit(NEWTONGUI_ERROR_INVALID_COORDINATE);
+        }
+        isX = true;
+    }
+
+    int ycoord;
+    bool isY = false;
+    if ( !cmdline_parser.value(ycoordOption).isEmpty() ) {
+        ycoord = cmdline_parser.value(ycoordOption).toInt(&ok);
+        if ( !ok ) {
+            QMessageBox::critical(0,"Error","Invalid y-coordinate of GUI window!");
+            exit(NEWTONGUI_ERROR_INVALID_COORDINATE);
+        }
+        isY = true;
+    }
+
     QHostAddress addr;
     QStringList pos_arg = cmdline_parser.positionalArguments();
 
@@ -101,6 +130,14 @@ int main(int argc, char *argv[])
 
     NewtonGui ng(fontsize);
     ng.SetFonts(fontsize,statusFontsize,logFontsize);
+
+    QPoint gui_pos = ng.pos();
+
+    if ( isX ) gui_pos.setX(xcoord);
+    if ( isY ) gui_pos.setY(ycoord);
+
+    if ( isX || isY ) ng.move(gui_pos);
+
     ng.show();
 //    QObject::connect(&ng,&NewtonGui::Error,[=](int err){exit(err);});
 

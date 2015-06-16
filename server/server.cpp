@@ -475,7 +475,8 @@ void Server::ExecuteCommand()
                 server_status_packet.SetStatus(Server::SERVER_ERROR_INVALID_ARGS,"");
             } else {
                 if ( flag == 0.0 ) shutter_open = false;
-                ShutterMode(flag);
+//                ShutterMode(flag); 16-06-2015 ERROR!!!! possible reason of shutter problems!!!
+                ShutterOpen(flag);
                 server_status_packet.SetStatus(lastError,"");
             }
         } else if ( command_name == NETPROTOCOL_COMMAND_EXPTIME ) {
